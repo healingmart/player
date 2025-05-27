@@ -37,7 +37,7 @@ const HealingK = {
     this.state.recentSearches = this.utils.loadFromStorage('hk-recent-searches', []);
     this.setupEventListeners();
     this.setupAdvancedDragScroll();
-    this.setupAutoHideUI();
+    this.setupAutoHideUI(); // 여기에 showUI가 포함되어 있습니다.
     this.progressBar.init();
     this.startPlayer();
     if (this.elements.hkHelpMoreLink && typeof HELP_MORE_URL !== 'undefined') {
@@ -262,7 +262,7 @@ const HealingK = {
       if (!this.state.isTouchDevice && this.elements.hkGridContainer) setupDrag(this.elements.hkGridContainer);
   },
   animateInertiaScroll(e,t){let i=t;const s=.95,o=.1,l=()=>{i*=s,Math.abs(i)<o||(e.scrollTop-=10*i,requestAnimationFrame(l))};requestAnimationFrame(l)},
-  setupAutoHideUI(){
+  setupAutoHideUI(){ // ★ 여기가 오류 발생 지점과 관련된 함수입니다.
     const showUI = ()=>{
       if(HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible || HealingK.state.isTransitioning) return;
 
@@ -272,11 +272,16 @@ const HealingK = {
       HealingK.state.uiVisible = true;
       clearTimeout(HealingK.state.uiTimeout);
 
-      if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+      // --- 수정된 부분: 플레이어 상태를 더 안전하게 확인 ---
+      if (HealingK.state.player &&
+          HealingK.state.isPlayerReady && // 플레이어가 API 호출 가능한 상태인지 확인
+          typeof HealingK.state.player.getPlayerState === 'function' && // getPlayerState 함수가 있는지 확인
+          HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
         HealingK.state.uiTimeout = setTimeout(()=>{
           HealingK.ui.hideUI();
         }, HealingK.state.uiAutoTimeoutDuration);
       }
+      // --- 수정된 부분 끝 ---
     };
 
     const hideUI = ()=>{
@@ -298,7 +303,8 @@ const HealingK = {
     document.addEventListener("mousemove", showUI);
     document.addEventListener("touchstart", showUI, { passive: true });
 
-     setTimeout(() => showUI(), 500);
+    // 초기 UI 표시 시에도 showUI가 호출되므로, 플레이어 준비 상태를 확인하는 것이 중요합니다.
+    setTimeout(() => showUI(), 500);
 
     HealingK.ui.showUI = showUI;
     HealingK.ui.hideUI = hideUI;
@@ -431,7 +437,11 @@ HealingK.progressBar = {
 
 HealingK.utils = {
   debounce(func, wait) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); }; },
-  getOptimizedThumbnail(videoId) { const quality = window.innerWidth <= 768 ? 'mqdefault' : 'hqdefault'; return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`; },
+  getOptimizedThumbnail(videoId) {
+    if (!videoId) return 'https://placehold.co/180x320/111111/FFFFFF?text=Invalid+ID'; // videoId가 없을 경우 대체 이미지
+    const quality = window.innerWidth <= 768 ? 'mqdefault' : 'hqdefault';
+    return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
+  },
   saveToStorage(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn('LS save failed:', e); e.message = 'LS save failed: ' + e.message; HealingK.ui.showMessage('데이터 저장에 실패했습니다.', 2000); } },
   loadFromStorage(key, dV = null) { try { const i = localStorage.getItem(key); return i ? JSON.parse(i) : dV; } catch (e) { console.warn('LS load failed:', e); e.message = 'LS load failed: ' + e.message; return dV; } } ,
   setScreenSize() {
@@ -628,7 +638,7 @@ HealingK.dataManager = {
 HealingK.share = {
   generateShareUrl() {
     const currentVideo = HealingK.dataManager.getCurrentVideo();
-    const baseUrl = (typeof BLOG_POST_URL !== 'undefined' ? BLOG_POST_URL.replace(/\/+$/, '') : window.location.origin) + '/?';
+    const baseUrl = (typeof BLOG_POST_URL !== 'undefined' && BLOG_POST_URL ? BLOG_POST_URL.replace(/\/+$/, '') : window.location.origin) + '/?';
 
     if (currentVideo) {
       return `${baseUrl}videoId=${encodeURIComponent(currentVideo.id)}`;
@@ -755,7 +765,7 @@ HealingK.ui = {
         if (videosToRender.length === 0) {
             const nR=document.createElement('div');
             nR.style.cssText=`grid-column:1/-1;text-align:center;color:var(--text-muted);padding:40px 0;`;
-            nR.textContent = category && category.category === "MY앨범" ? 'MY앨범 목록이 비어있습니다.' : '영상이 없습니다.';
+            nR.textContent = category && typeof MY_ALBUM_CATEGORY_INDEX !== 'undefined' && category.category === "MY앨범" ? 'MY앨범 목록이 비어있습니다.' : '영상이 없습니다.';
             fragment.appendChild(nR);
         } else {
             videosToRender.forEach((vid,idx)=>{
@@ -863,7 +873,7 @@ HealingK.ui = {
 
       if (shouldBeVisible) { // Panel is opening
           if (state.player && state.isPlayerReady && state.player.getVolume && state.player.mute) {
-             if (!HealingK.state.isFadingOut) { // Only update originalVolume if not currently in a fade
+             if (!HealingK.state.isFadingOut) {
                 state.originalVolume = state.player.getVolume();
              }
              state.player.mute();
@@ -887,25 +897,22 @@ HealingK.ui = {
           let shouldRestoreVolumeManually = true;
 
           if (state.player && state.isPlayerReady && state.player.unMute && state.player.setVolume && state.player.mute) {
-              if (state.soundEnabled && !state.isMuted) { // If sound should be on
+              if (state.soundEnabled && !state.isMuted) {
                  state.player.unMute();
-                 if (HealingK.state.isFadingOut) {
-                     shouldRestoreVolumeManually = false; // Let fade logic handle volume
+                 if (HealingK.state.isFadingOut) { // 페이드 아웃 중이면 수동 볼륨 복원 안 함
+                     shouldRestoreVolumeManually = false;
                  }
-              } else { // If sound should be off (user muted or sound disabled)
+              } else {
                  state.player.mute();
                  shouldRestoreVolumeManually = false;
               }
 
-              if (shouldRestoreVolumeManually) {
-                  if (state.originalVolume !== undefined) {
-                      state.player.setVolume(state.originalVolume);
-                  }
+              if (shouldRestoreVolumeManually && state.originalVolume !== undefined) {
+                  state.player.setVolume(state.originalVolume);
               }
           }
-          // Ensure the UI update loop for progress bar (and fade) is running if player is playing
           if (state.player && state.player.getPlayerState && state.player.getPlayerState() === YT.PlayerState.PLAYING) {
-              HealingK.ui.startProgressBarUpdate();
+              HealingK.ui.startProgressBarUpdate(); // 페이드 로직이 포함된 업데이트 재시작
           }
           this.showUI();
       }
@@ -1052,7 +1059,6 @@ HealingK.ui = {
     }
     if (HealingK.elements.body) HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isHelpModalVisible);
 
-
     if (HealingK.state.isHelpModalVisible) { // Modal is opening
         if (HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.player.getVolume && HealingK.state.player.mute) {
             if (!HealingK.state.isFadingOut) {
@@ -1192,8 +1198,8 @@ HealingK.ui = {
                     if (!HealingK.state.isMuted && HealingK.state.soundEnabled && player.setVolume) {
                         player.setVolume(Math.round(targetVolume));
                     }
-                } else { // Not in fade zone OR duration too short for fade
-                    if (HealingK.state.isFadingOut) { // Was fading, but now out of zone
+                } else {
+                    if (HealingK.state.isFadingOut) {
                         HealingK.state.isFadingOut = false;
                         if (player.setVolume && !HealingK.state.isMuted && HealingK.state.soundEnabled) {
                             player.setVolume(HealingK.state.originalVolume);
@@ -1202,24 +1208,20 @@ HealingK.ui = {
                 }
             } else {
                 if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-                 if (HealingK.state.isFadingOut) { // Reset if duration becomes 0 while fading
+                 if (HealingK.state.isFadingOut) {
                     HealingK.state.isFadingOut = false;
                  }
             }
             HealingK.state.progressBarRAF = requestAnimationFrame(update);
-        } else { // Player not playing or not available
+        } else {
              if (HealingK.state.progressBarRAF) {
                 cancelAnimationFrame(HealingK.state.progressBarRAF);
                 HealingK.state.progressBarRAF = null;
              }
-             // If player stopped and was fading, restore volume if appropriate
              if (HealingK.state.isFadingOut) {
                  HealingK.state.isFadingOut = false;
                  if (player && player.setVolume && !HealingK.state.isMuted && HealingK.state.soundEnabled) {
-                     // Check player state here? If paused by user, volume should remain.
-                     // This case is tricky; typically onPlayerStateChange handles explicit pause/end.
-                     // For safety, let's assume if it stops playing not by ENDED state, originalVolume is desired.
-                     // player.setVolume(HealingK.state.originalVolume); // This might be too aggressive.
+                     // player.setVolume(HealingK.state.originalVolume); // 주석 처리: 상태 변경 시 처리되도록 유도
                  }
              }
         }
@@ -1231,75 +1233,12 @@ HealingK.ui = {
           cancelAnimationFrame(HealingK.state.progressBarRAF);
           HealingK.state.progressBarRAF = null;
       }
-      // If stopping progress bar update and was fading, ensure volume is restored if needed.
-      // However, this might conflict with seeking or explicit pause.
-      // The primary responsibility for restoring volume outside fade zone is in the `update` function itself or state changes.
       if (!HealingK.state.isDraggingProgressBar && HealingK.elements.hkProgressBarFill) {
           const playerState = HealingK.state.player?.getPlayerState?.();
            if (playerState === YT.PlayerState.ENDED) {
                HealingK.elements.hkProgressBarFill.style.width = '100%';
            }
-           // If paused, current progress should remain.
       }
-  },
-  showConfirmationModal(message, onConfirm, onCancel) {
-    const existingModal = document.getElementById('hk-confirmation-modal');
-    if (existingModal) existingModal.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'hk-confirmation-modal';
-    modal.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0,0,0,0.7); display: flex; align-items: center;
-        justify-content: center; z-index: 10000; padding: 15px;
-    `;
-
-    const modalContent = document.createElement('div');
-    modalContent.style.cssText = `
-        background-color: #333; color: #fff; padding: 25px; border-radius: 8px;
-        text-align: center; max-width: 300px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    `;
-
-    const messageP = document.createElement('p');
-    messageP.textContent = message;
-    messageP.style.marginBottom = '20px';
-    messageP.style.fontSize = '16px';
-    messageP.style.lineHeight = '1.5';
-
-
-    const buttonContainer = document.createElement('div');
-    buttonContainer.style.display = 'flex';
-    buttonContainer.style.justifyContent = 'space-around';
-
-
-    const confirmButton = document.createElement('button');
-    confirmButton.textContent = '확인';
-    confirmButton.style.cssText = `
-        padding: 10px 20px; background-color: var(--accent-color, #E91E63); color: white;
-        border: none; border-radius: 5px; cursor: pointer; font-size: 14px; margin-left: 5px;
-    `;
-    confirmButton.onclick = () => {
-        if (onConfirm) onConfirm();
-        modal.remove();
-    };
-
-    const cancelButton = document.createElement('button');
-    cancelButton.textContent = '취소';
-    cancelButton.style.cssText = `
-        padding: 10px 20px; background-color: #555; color: white;
-        border: none; border-radius: 5px; cursor: pointer; font-size: 14px; margin-right: 5px;
-    `;
-    cancelButton.onclick = () => {
-        if (onCancel) onCancel();
-        modal.remove();
-    };
-
-    buttonContainer.appendChild(cancelButton);
-    buttonContainer.appendChild(confirmButton);
-    modalContent.appendChild(messageP);
-    modalContent.appendChild(buttonContainer);
-    modal.appendChild(modalContent);
-    document.body.appendChild(modal);
   }
 };
 
@@ -1355,7 +1294,7 @@ HealingK.youtubeManager = {
            const duration = evt.target.getDuration();
            HealingK.progressBar.updateTooltip(0, duration);
        } else {
-            HealingK.progressBar.updateTooltip(0,0);
+           HealingK.progressBar.updateTooltip(0,0);
        }
   },
 
@@ -1501,7 +1440,7 @@ HealingK.youtubeManager = {
       }
       case YT.PlayerState.PAUSED:
             HealingK.ui.hideLoading();
-            HealingK.ui.stopProgressBarUpdate(); // This will also cancel fade RAF
+            HealingK.ui.stopProgressBarUpdate();
             clearTimeout(HealingK.state.uiTimeout);
             break;
       case YT.PlayerState.BUFFERING:{
@@ -1622,7 +1561,7 @@ HealingK.controller = {
     } else {
          HealingK.state.isTransitioning = false;
     }
-    HealingK.state.isFadingOut = false; // Always reset fade state when a new video starts loading
+    HealingK.state.isFadingOut = false;
 
     const vid=HealingK.dataManager.getCurrentVideo();
     if(vid){
@@ -1752,14 +1691,13 @@ HealingK.controller = {
     if(HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.player.unMute && HealingK.state.player.setVolume &&
        !HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
         HealingK.state.player.unMute();
-        if (!HealingK.state.isFadingOut) { // 페이드 아웃 중이 아닐 때만 볼륨 직접 설정
+        if (!HealingK.state.isFadingOut) {
             if (HealingK.state.originalVolume !== undefined) {
                 HealingK.state.player.setVolume(HealingK.state.originalVolume);
             } else {
                 HealingK.state.player.setVolume(100);
             }
         }
-        // 페이드 아웃 중이라면, startProgressBarUpdate 루프가 볼륨을 관리합니다.
     }
     if (HealingK.elements.hkSoundToggle) HealingK.elements.hkSoundToggle.classList.add('hidden');
     HealingK.ui.updateBottomNav();
@@ -1771,12 +1709,11 @@ HealingK.controller = {
 
     HealingK.state.isMuted=!HealingK.state.isMuted;
     if(HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.player.mute && HealingK.state.player.unMute && HealingK.state.player.setVolume){
-      if(HealingK.state.isMuted) { // 사용자가 음소거를 원함
+      if(HealingK.state.isMuted) {
           HealingK.state.player.mute();
-      } else { // 사용자가 음소거 해제를 원함
+      } else {
           if(!HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
              HealingK.state.player.unMute();
-             // 페이드 아웃 중이 아니라면, 원래 볼륨으로 복원
              if (!HealingK.state.isFadingOut) {
                  if (HealingK.state.originalVolume !== undefined) {
                      HealingK.state.player.setVolume(HealingK.state.originalVolume);
@@ -1784,13 +1721,8 @@ HealingK.controller = {
                      HealingK.state.player.setVolume(100);
                  }
              }
-             // 페이드 아웃 중이라면, startProgressBarUpdate 루프가 현재 페이드 진행에 맞는 볼륨을 설정할 것임.
-             // 여기서 unMute만 해주고 볼륨은 건드리지 않음.
           } else {
-              // 패널/모달이 열려있으면, 플레이어는 음소거 상태를 유지해야 함.
-              // 하지만 사용자의 의도는 '음소거 해제'이므로 HealingK.state.isMuted는 false로 둡니다.
-              // 패널/모달이 닫힐 때 이 상태를 참조하여 최종 볼륨을 결정합니다.
-              HealingK.state.player.mute(); // 프로그램적 음소거 유지
+              HealingK.state.player.mute();
           }
       }
     }
