@@ -19,10 +19,12 @@ const HealingK = {
     centerPlayPauseTimeout: null,
     centerMuteStatusVisible: false,
     centerMuteStatusTimeout: null,
-    originalVolume: 100,
+    originalVolume: 100, // 사용자가 설정한 원래 볼륨 (기본 100)
     uiAutoTimeoutDuration: 3000,
     recentSearches: [],
-    isDraggingProgressBar: false // 진행바 드래그 상태 추가
+    isDraggingProgressBar: false, // 진행바 드래그 상태 추가
+    fadeAudioIntervalId: null, // 오디오 페이드 아웃 인터벌 ID
+    fadeOutDuration: 4 // 오디오 페이드 아웃 지속 시간 (초)
   },
   elements: {},
   init() {
@@ -84,8 +86,8 @@ const HealingK = {
 
           const keyActionMap = {
             'Space': () => this.controller.togglePlayPause(),
-            'ArrowUp': () => this.controller.playNextVideoWithAnimation(), // 위 화살표: 다음 영상
-            'ArrowDown': () => this.controller.playPrevVideoWithAnimation(), // 아래 화살표: 이전 영상
+            'ArrowUp': () => this.controller.playPrevVideoWithAnimation(),
+            'ArrowDown': () => this.controller.playNextVideoWithAnimation(),
             'ArrowLeft': () => this.controller.prevCategory(),
             'ArrowRight': () => this.controller.nextCategory(),
             'm': () => this.controller.toggleMute(),
@@ -167,9 +169,9 @@ const HealingK = {
         document.querySelectorAll('.hk-sort-buttons .hk-sort-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.state.searchSort = btn.dataset.sort;
-          if (this.elements.hkMyAlbumControls) {
-              this.elements.hkMyAlbumControls.style.display = 'none';
-          }
+         if (this.elements.hkMyAlbumControls) {
+             this.elements.hkMyAlbumControls.style.display = 'none';
+         }
         const currentQuery = this.elements.hkSearchInput ? this.elements.hkSearchInput.value : '';
         this.search.performSearch(currentQuery);
       });
@@ -189,13 +191,13 @@ const HealingK = {
         });
     }
 
-      if (this.elements.hkClearAllBookmarks) {
-          this.utils.addTapListener(this.elements.hkClearAllBookmarks, () => {
-              if (confirm('MY앨범의 모든 영상을 삭제하시겠습니까?')) {
-                  this.controller.clearAllBookmarks();
-              }
-          });
-      }
+     if (this.elements.hkClearAllBookmarks) {
+         this.utils.addTapListener(this.elements.hkClearAllBookmarks, () => {
+             if (confirm('MY앨범의 모든 영상을 삭제하시겠습니까?')) {
+                 this.controller.clearAllBookmarks();
+             }
+         });
+     }
 
     this.setupMouseHoverEvents();
     this.setupTouchEvents();
@@ -204,13 +206,13 @@ const HealingK = {
         this.utils.setScreenSize();
         if (this.state.isPanelVisible && !this.state.isTouchDevice) this.ui.renderActiveGrid();
     }, 200));
-      window.addEventListener('orientationchange', () => setTimeout(() => this.utils.setScreenSize(), 300));
-      document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') setTimeout(() => this.utils.setScreenSize(), 300);
-      });
-      if (window.visualViewport) {
-          window.visualViewport.addEventListener('resize', () => this.utils.setScreenSize());
-      }
+     window.addEventListener('orientationchange', () => setTimeout(() => this.utils.setScreenSize(), 300));
+     document.addEventListener('visibilitychange', () => {
+         if (document.visibilityState === 'visible') setTimeout(() => this.utils.setScreenSize(), 300);
+     });
+     if (window.visualViewport) {
+         window.visualViewport.addEventListener('resize', () => this.utils.setScreenSize());
+     }
   },
   setupMouseHoverEvents() {
     if (this.state.isTouchDevice || !this.elements.hkSidePanel) return;
@@ -298,7 +300,7 @@ const HealingK = {
     document.addEventListener("mousemove", showUI);
     document.addEventListener("touchstart", showUI, { passive: true });
 
-      setTimeout(() => showUI(), 500);
+     setTimeout(() => showUI(), 500);
 
     HealingK.ui.showUI = showUI;
     HealingK.ui.hideUI = hideUI;
@@ -379,7 +381,7 @@ HealingK.progressBar = {
             isDragging = true;
             HealingK.state.isDraggingProgressBar = true; // 전역 상태 업데이트
             this.handleSeek(event);
-            // 드래그 중에는 영상 일시정지 (선택 사항)
+             // 드래그 중에는 영상 일시정지 (선택 사항)
             // if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
             //     HealingK.state.player.pauseVideo();
             // }
@@ -388,18 +390,18 @@ HealingK.progressBar = {
         const onPointerMove = (event) => {
             if (!isDragging) { // 드래그 중이 아닐 때는 툴팁만 업데이트
                  if (HealingK.state.player && HealingK.state.isPlayerReady) {
-                     const duration = HealingK.state.player.getDuration();
-                     if (duration > 0) {
-                         const rect = progressBarContainer.getBoundingClientRect();
-                         const offsetX = event.clientX - rect.left;
-                         const barWidth = progressBarContainer.offsetWidth;
-                         let percentage = offsetX / barWidth;
-                         percentage = Math.max(0, Math.min(1, percentage));
-                         const hoverTime = percentage * duration;
-                         this.updateTooltip(hoverTime, duration, event);
-                     }
-                 }
-                 return;
+                    const duration = HealingK.state.player.getDuration();
+                    if (duration > 0) {
+                        const rect = progressBarContainer.getBoundingClientRect();
+                        const offsetX = event.clientX - rect.left;
+                        const barWidth = progressBarContainer.offsetWidth;
+                        let percentage = offsetX / barWidth;
+                        percentage = Math.max(0, Math.min(1, percentage));
+                        const hoverTime = percentage * duration;
+                        this.updateTooltip(hoverTime, duration, event);
+                    }
+                }
+                return;
             }
             this.handleSeek(event);
         };
@@ -409,7 +411,7 @@ HealingK.progressBar = {
                 this.handleSeek(event); // 마지막 위치로 최종 탐색
                 isDragging = false;
                 HealingK.state.isDraggingProgressBar = false; // 전역 상태 업데이트
-                // 드래그 종료 후 영상 다시 재생 (선택 사항)
+                 // 드래그 종료 후 영상 다시 재생 (선택 사항)
                 // if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PAUSED) {
                 //     HealingK.state.player.playVideo();
                 // }
@@ -419,7 +421,7 @@ HealingK.progressBar = {
         // PC (Mouse)
         progressBarContainer.addEventListener('mousedown', onPointerDown);
         document.addEventListener('mousemove', onPointerMove); // document에 달아서 바깥으로 드래그해도 인식
-        document.addEventListener('mouseup', onPointerUp);       // document에 달아서 바깥에서 놓아도 인식
+        document.addEventListener('mouseup', onPointerUp);     // document에 달아서 바깥에서 놓아도 인식
 
         // Mobile (Touch)
         progressBarContainer.addEventListener('touchstart', (e) => { e.preventDefault(); onPointerDown(e); }, { passive: false });
@@ -430,8 +432,8 @@ HealingK.progressBar = {
         progressBarContainer.addEventListener('mouseenter', () => {
             if (HealingK.elements.hkProgressBarTooltip && HealingK.state.player && HealingK.state.isPlayerReady) {
                 const duration = HealingK.state.player.getDuration();
-                // 마우스 진입 시 툴팁 표시 (내용은 mousemove에서 업데이트)
-                // HealingK.elements.hkProgressBarTooltip.classList.add('visible'); // CSS :hover로 처리
+                 // 마우스 진입 시 툴팁 표시 (내용은 mousemove에서 업데이트)
+                 // HealingK.elements.hkProgressBarTooltip.classList.add('visible'); // CSS :hover로 처리
                 if (duration > 0) {
                     // 초기 툴팁 내용 설정 (00:00 / 총시간)
                     this.updateTooltip(0, duration);
@@ -588,7 +590,7 @@ HealingK.dataManager = {
              }
           } else {
              if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
-               HealingK.state.currentVideoIndex = Math.max(0, Math.min(HealingK.state.currentVideoIndex, currentBookmarks.length - 1));
+                HealingK.state.currentVideoIndex = Math.max(0, Math.min(HealingK.state.currentVideoIndex, currentBookmarks.length - 1));
              }
              if ((HealingK.state.isPanelVisible && HealingK.state.panelMode === 'thumbnail' && HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
                  HealingK.ui.renderActiveGrid();
@@ -607,20 +609,20 @@ HealingK.dataManager = {
         return allVideos.find(video => video.id === bookmarkId);
     }).filter(video => video);
   },
-    clearAllBookmarks() {
+   clearAllBookmarks() {
         HealingK.state.bookmarkedVideos = [];
         HealingK.utils.saveToStorage('hk-bookmarks', HealingK.state.bookmarkedVideos);
         HealingK.ui.showMessage('MY앨범의 모든 영상이 삭제되었습니다.', 2000);
         HealingK.ui.updateBottomNav();
         HealingK.ui.renderCategoryTabs();
 
-          if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
-              HealingK.ui.renderActiveGrid();
-              if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
+         if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
+             HealingK.ui.renderActiveGrid();
+             if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
                 HealingK.controller.goHome();
-              }
-          }
-    }
+             }
+         }
+   }
 };
 
 HealingK.share = {
@@ -687,8 +689,8 @@ HealingK.ui = {
             const isMyAlbumTab = (idx === MY_ALBUM_CATEGORY_INDEX);
             if (isMyAlbumTab) {
                 tab.classList.add('my-album-tab');
-                const bookmarkCount = HealingK.state.bookmarkedVideos.length;
-                tab.textContent = `MY앨범 (${bookmarkCount})`;
+                 const bookmarkCount = HealingK.state.bookmarkedVideos.length;
+                 tab.textContent = `MY앨범 (${bookmarkCount})`;
             } else {
                 tab.textContent=catData.category;
             }
@@ -852,10 +854,14 @@ HealingK.ui = {
         elements.hkPanelClose.style.display = shouldBeVisible ? 'flex' : 'none';
       }
 
-      if (shouldBeVisible) {
+      if (shouldBeVisible) { // 패널이 열릴 때
           if (state.player && state.isPlayerReady) {
-             state.originalVolume = state.player.getVolume();
-             state.player.mute();
+             // 패널 열기 전 볼륨을 originalVolume에 저장 (음소거되지 않은 상태였을 때만)
+             if (!state.isMuted && state.soundEnabled) {
+                 state.originalVolume = state.player.getVolume();
+             }
+             state.player.mute(); // 플레이어 음소거
+             HealingK.youtubeManager.stopAudioFadeOut(); // 페이드 아웃 중지
           }
           this.hideUI();
           clearTimeout(HealingK.state.uiTimeout);
@@ -868,18 +874,23 @@ HealingK.ui = {
               elements.hkPanelTitle.innerHTML = (state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) ? '❤️ MY앨범' : '📋 재생목록';
               elements.hkSearchElements.style.display='none';
                if (HealingK.elements.hkMyAlbumControls) {
-                   this.state.panelMode === 'thumbnail' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX
-                       ? HealingK.elements.hkMyAlbumControls.style.display = 'flex'
-                       : HealingK.elements.hkMyAlbumControls.style.display = 'none';
-              }
+                    this.state.panelMode === 'thumbnail' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX
+                        ? HealingK.elements.hkMyAlbumControls.style.display = 'flex'
+                        : HealingK.elements.hkMyAlbumControls.style.display = 'none';
+               }
           }
           this.renderActiveGrid();
-      } else {
+      } else { // 패널이 닫힐 때
           if (state.player && state.isPlayerReady && state.soundEnabled && !state.isMuted) {
              state.player.unMute();
              if (state.originalVolume !== undefined) state.player.setVolume(state.originalVolume);
+             // 플레이어가 재생 중이면 페이드 아웃 체크 다시 시작
+             if (state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+                 HealingK.youtubeManager.startAudioFadeOutCheck();
+             }
           } else if (state.player && state.isPlayerReady) {
-             state.player.mute();
+             state.player.mute(); // 음소거 상태 유지
+             HealingK.youtubeManager.stopAudioFadeOut(); // 페이드 아웃 중지
           }
           this.showUI();
       }
@@ -1031,19 +1042,28 @@ HealingK.ui = {
     }
     HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isHelpModalVisible);
 
-    if (HealingK.state.isHelpModalVisible) {
+    if (HealingK.state.isHelpModalVisible) { // 모달이 열릴 때
         if (HealingK.state.player && HealingK.state.isPlayerReady) {
-            HealingK.state.originalVolume = HealingK.state.player.getVolume();
-            HealingK.state.player.mute();
+            // 모달 열기 전 볼륨을 originalVolume에 저장 (음소거되지 않은 상태였을 때만)
+            if (!HealingK.state.isMuted && HealingK.state.soundEnabled) {
+                HealingK.state.originalVolume = HealingK.state.player.getVolume();
+            }
+            HealingK.state.player.mute(); // 플레이어 음소거
+            HealingK.youtubeManager.stopAudioFadeOut(); // 페이드 아웃 중지
         }
         this.hideUI();
         clearTimeout(HealingK.state.uiTimeout);
-    } else {
+    } else { // 모달이 닫힐 때
         if (HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.soundEnabled && !HealingK.state.isMuted) {
             HealingK.state.player.unMute();
             if (HealingK.state.originalVolume !== undefined) HealingK.state.player.setVolume(HealingK.state.originalVolume);
+            // 플레이어가 재생 중이면 페이드 아웃 체크 다시 시작
+            if (HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+                HealingK.youtubeManager.startAudioFadeOutCheck();
+            }
         } else if (HealingK.state.player && HealingK.state.isPlayerReady) {
-            HealingK.state.player.mute();
+            HealingK.state.player.mute(); // 음소거 상태 유지
+            HealingK.youtubeManager.stopAudioFadeOut(); // 페이드 아웃 중지
         }
         this.showUI();
     }
@@ -1062,19 +1082,28 @@ HealingK.ui = {
     }
     HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isShareModalVisible);
 
-    if (HealingK.state.isShareModalVisible) {
+    if (HealingK.state.isShareModalVisible) { // 모달이 열릴 때
         if (HealingK.state.player && HealingK.state.isPlayerReady) {
-            HealingK.state.originalVolume = HealingK.state.player.getVolume();
-            HealingK.state.player.mute();
+            // 모달 열기 전 볼륨을 originalVolume에 저장 (음소거되지 않은 상태였을 때만)
+            if (!HealingK.state.isMuted && HealingK.state.soundEnabled) {
+                HealingK.state.originalVolume = HealingK.state.player.getVolume();
+            }
+            HealingK.state.player.mute(); // 플레이어 음소거
+            HealingK.youtubeManager.stopAudioFadeOut(); // 페이드 아웃 중지
         }
         this.hideUI();
         clearTimeout(HealingK.state.uiTimeout);
-    } else {
+    } else { // 모달이 닫힐 때
         if (HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.soundEnabled && !HealingK.state.isMuted) {
             HealingK.state.player.unMute();
             if (HealingK.state.originalVolume !== undefined) HealingK.state.player.setVolume(HealingK.state.originalVolume);
+            // 플레이어가 재생 중이면 페이드 아웃 체크 다시 시작
+            if (HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+                HealingK.youtubeManager.startAudioFadeOutCheck();
+            }
         } else if (HealingK.state.player && HealingK.state.isPlayerReady) {
-            HealingK.state.player.mute();
+            HealingK.state.player.mute(); // 음소거 상태 유지
+            HealingK.youtubeManager.stopAudioFadeOut(); // 페이드 아웃 중지
         }
         this.showUI();
     }
@@ -1112,8 +1141,8 @@ HealingK.ui = {
         // 드래그 중이면 업데이트 중단
         if (HealingK.state.isDraggingProgressBar) {
              if (HealingK.state.progressBarRAF) {
-                 cancelAnimationFrame(HealingK.state.progressBarRAF);
-                 HealingK.state.progressBarRAF = null;
+                cancelAnimationFrame(HealingK.state.progressBarRAF);
+                HealingK.state.progressBarRAF = null;
              }
             return;
         }
@@ -1133,8 +1162,8 @@ HealingK.ui = {
             HealingK.state.progressBarRAF = requestAnimationFrame(update);
         } else {
              if (HealingK.state.progressBarRAF) {
-                 cancelAnimationFrame(HealingK.state.progressBarRAF);
-                 HealingK.state.progressBarRAF = null;
+                cancelAnimationFrame(HealingK.state.progressBarRAF);
+                HealingK.state.progressBarRAF = null;
              }
         }
     }
@@ -1161,15 +1190,80 @@ HealingK.ui = {
 };
 
 HealingK.youtubeManager = {
-  // 페이드 아웃 관련 속성 추가
-  fadeInterval: null,
-  FADE_DURATION: 4, // 페이드 아웃 지속 시간 (초)
+  // 현재 진행 중인 오디오 페이드 아웃을 중지하는 함수
+  stopAudioFadeOut() {
+    if (HealingK.state.fadeAudioIntervalId) {
+        clearInterval(HealingK.state.fadeAudioIntervalId);
+        HealingK.state.fadeAudioIntervalId = null;
+        // 음소거되지 않은 상태이고 플레이어가 존재하면 원래 볼륨으로 복원
+        if (HealingK.state.player && HealingK.state.isPlayerReady && !HealingK.state.isMuted && HealingK.state.soundEnabled) {
+            HealingK.state.player.setVolume(HealingK.state.originalVolume);
+        }
+    }
+  },
 
-  initPlayer(vId, animationDirection = 'none'){ // 기존과 동일
+  // 오디오 페이드 아웃을 체크하고 시작하는 함수
+  startAudioFadeOutCheck() {
+      this.stopAudioFadeOut(); // 기존 인터벌이 있다면 중지
+
+      const player = HealingK.state.player;
+      if (!player || !HealingK.state.isPlayerReady || HealingK.state.isMuted || !HealingK.state.soundEnabled) {
+          return; // 플레이어 없거나, 준비 안 됐거나, 음소거 상태거나, 사운드 비활성화면 실행 안 함
+      }
+
+      HealingK.state.fadeAudioIntervalId = setInterval(() => {
+          if (!player || player.getPlayerState() !== YT.PlayerState.PLAYING) {
+              this.stopAudioFadeOut(); // 재생 중이 아니면 중지
+              return;
+          }
+
+          const currentTime = player.getCurrentTime();
+          const duration = player.getDuration();
+          const fadeOutDuration = HealingK.state.fadeOutDuration;
+
+          if (duration <= 0) return; // 총 재생시간이 없으면 계산 불가
+
+          // 영상 길이가 페이드 아웃 시간보다 짧을 경우, 영상 전체에 걸쳐 페이드 아웃
+          if (duration < fadeOutDuration) {
+              const currentVolume = player.getVolume();
+              const fadeProgress = currentTime / duration; // 0에서 1까지 진행도
+              let targetVolume = HealingK.state.originalVolume * (1 - fadeProgress); // 진행도에 따라 볼륨 감소
+              targetVolume = Math.max(0, Math.min(HealingK.state.originalVolume, targetVolume));
+
+              if (Math.abs(currentVolume - targetVolume) > 1) { // 볼륨 변화가 충분할 때만 적용
+                  player.setVolume(Math.round(targetVolume));
+              }
+              return;
+          }
+
+          const remainingTime = duration - currentTime;
+
+          if (remainingTime <= fadeOutDuration) {
+              // 남은 시간에 비례하여 볼륨 계산
+              // 남은 시간이 fadeOutDuration이면 originalVolume, 0이면 0
+              let targetVolume = (remainingTime / fadeOutDuration) * HealingK.state.originalVolume;
+              targetVolume = Math.max(0, Math.min(HealingK.state.originalVolume, targetVolume)); // 0과 originalVolume 사이로 제한
+
+              if (Math.abs(player.getVolume() - targetVolume) > 1) { // 볼륨 변화가 충분할 때만 적용
+                  player.setVolume(Math.round(targetVolume));
+              }
+          } else {
+              // 페이드 아웃 구간 밖이고 음소거 상태가 아니면, 원래 볼륨으로 유지
+              if (!HealingK.state.isMuted && HealingK.state.soundEnabled) {
+                  if (player.getVolume() !== HealingK.state.originalVolume) {
+                      player.setVolume(HealingK.state.originalVolume);
+                  }
+              }
+          }
+      }, 50); // 50밀리초마다 체크하여 부드러운 페이드 효과
+  },
+
+  initPlayer(vId, animationDirection = 'none'){
+    // 플레이어 초기화/교체 전에 기존 페이드 아웃 중지
+    this.stopAudioFadeOut();
+
     if(HealingK.state.player) {
         HealingK.ui.stopProgressBarUpdate();
-        // 플레이어 파괴 전에 페이드 아웃 모니터링 중지
-        this.stopFadeOut();
         if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
         HealingK.progressBar.updateTooltip(0,0); // 툴팁 초기화
 
@@ -1180,14 +1274,14 @@ HealingK.youtubeManager = {
 
     const playerEmbed = HealingK.elements.hkYoutubeEmbed;
     if (!playerEmbed) {
-        console.error("hk-youtube-embed element not found!");
-        HealingK.ui.hideLoading();
-        HealingK.state.isTransitioning = false;
-        return;
+         console.error("hk-youtube-embed element not found!");
+         HealingK.ui.hideLoading();
+         HealingK.state.isTransitioning = false;
+         return;
     }
 
     if (animationDirection === 'none') {
-        HealingK.ui.showLoading();
+         HealingK.ui.showLoading();
     }
 
     HealingK.state.player=new YT.Player('hk-youtube-embed',{
@@ -1197,20 +1291,18 @@ HealingK.youtubeManager = {
     });
   },
 
-  onPlayerReady(evt, animationDirection){ // 기존과 동일
+  onPlayerReady(evt, animationDirection){
       HealingK.state.isPlayerReady=true;
 
+      // 음소거 상태 적용
       if (HealingK.state.isMuted || !HealingK.state.soundEnabled || HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible) {
           evt.target.mute();
       } else {
           evt.target.unMute();
+          // originalVolume으로 볼륨 설정 (기본 100)
+          evt.target.setVolume(HealingK.state.originalVolume);
       }
-       if (HealingK.state.originalVolume !== undefined) {
-           evt.target.setVolume(HealingK.state.originalVolume);
-       } else {
-           evt.target.setVolume(100);
-       }
-
+       
        if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
        
        const duration = evt.target.getDuration();
@@ -1219,13 +1311,16 @@ HealingK.youtubeManager = {
 
   /************ loadVideo : 썸네일 먼저 띄우기 ********************/
   loadVideo(vId,animationDirection='none'){
+    // 새 영상 로드 전에 기존 페이드 아웃 중지
+    this.stopAudioFadeOut();
+
     const playerEmbed=HealingK.elements.hkYoutubeEmbed;
     if(!playerEmbed){
       console.error('hk-youtube-embed element not found!');
       HealingK.state.isTransitioning=false;
       HealingK.ui.hideLoading();
       if(HealingK.elements.hkProgressBarFill)
-          HealingK.elements.hkProgressBarFill.style.width='0%';
+         HealingK.elements.hkProgressBarFill.style.width='0%';
       HealingK.progressBar.updateTooltip(0,0);
       return;
     }
@@ -1294,14 +1389,11 @@ HealingK.youtubeManager = {
   onPlayerStateChange(evt){
     if(!evt.target)return;
     const playerState=evt.data;
-    const player = evt.target;
     const playerEmbed=HealingK.elements.hkYoutubeEmbed;
-    const duration = player.getDuration();
-    const currentTime = player.getCurrentTime();
+    const duration = evt.target.getDuration();
 
-    // 진행바 툴팁 업데이트 (페이드 아웃 로직과 무관하게 항상 업데이트)
-    if (duration > 0) {
-        HealingK.progressBar.updateTooltip(currentTime, duration);
+    if (duration > 0 && HealingK.state.player) {
+        HealingK.progressBar.updateTooltip(HealingK.state.player.getCurrentTime(), duration);
     }
 
     // 유튜브 더보기 영상 오버레이 차단을 위한 추가 처리
@@ -1316,13 +1408,11 @@ HealingK.youtubeManager = {
       }
     }
 
-    // 상태 변경 시 기존 페이드 아웃 모니터링 중지
-    this.stopFadeOut();
-
     switch(playerState){
       case YT.PlayerState.ENDED: // 기존 코드 유지
+            this.stopAudioFadeOut(); // 영상 종료 시 페이드 아웃 중지
             if (!HealingK.state.isTransitioning) {
-                HealingK.ui.showLoading();
+                 HealingK.ui.showLoading();
             }
             HealingK.ui.stopProgressBarUpdate();
             if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '100%';
@@ -1340,8 +1430,8 @@ HealingK.youtubeManager = {
           setTimeout(()=>ph.classList.add('hidden'),50);
         }
         /* 이후 기존 PLAYING 처리 ------------------- */
-          if (HealingK.state.isTransitioning) {
-              if (playerEmbed) {
+         if (HealingK.state.isTransitioning) {
+             if (playerEmbed) {
                   // 더 부드러운 easing curve와 타이밍 적용
                   playerEmbed.style.transition = 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease-out';
                   playerEmbed.style.transform = 'translateY(0)';
@@ -1351,41 +1441,35 @@ HealingK.youtubeManager = {
                       HealingK.state.isTransitioning = false;
                       if (playerEmbed) playerEmbed.style.transition = 'opacity 0.3s ease';
                   }, 350);
-              } else {
+             } else {
                   HealingK.state.isTransitioning = false;
-              }
-          } else {
+             }
+         } else {
               if (playerEmbed) {
                   // 일반 상태에서도 부드러운 트랜지션 적용
                   playerEmbed.style.transition = 'opacity 0.3s ease-out';
                   playerEmbed.style.transform = 'translateY(0)';
                   playerEmbed.style.opacity = 1;
               }
-          }
+         }
         HealingK.ui.hideLoading();
         HealingK.ui.startProgressBarUpdate();
 
-        // 패널/모달이 열려있거나 음소거/사운드 비활성화 상태면 음소거
-        if(HealingK.state.isPanelVisible||HealingK.state.isHelpModalVisible||HealingK.state.isShareModalVisible || !HealingK.state.soundEnabled||HealingK.state.isMuted) {
-            player.mute();
-        } else {
-            // 그렇지 않으면 음소거 해제 및 원래 볼륨 설정
-            if (HealingK.state.originalVolume !== undefined) {
-                player.setVolume(HealingK.state.originalVolume);
-            } else {
-                player.setVolume(100); // 기본 볼륨 100
-            }
-            player.unMute();
+        // 재생 시작 시 페이드 아웃 체크 시작
+        this.startAudioFadeOutCheck();
+
+        if(HealingK.state.isPanelVisible||HealingK.state.isHelpModalVisible||HealingK.state.isShareModalVisible || !HealingK.state.soundEnabled||HealingK.state.isMuted)evt.target.mute();
+        else {
+             // originalVolume으로 볼륨 설정 (기본 100)
+             evt.target.setVolume(HealingK.state.originalVolume);
+             evt.target.unMute();
         }
-
-        // 재생 중일 때만 페이드 아웃 모니터링 시작
-        this.startFadeOutMonitor(player);
-
         if (HealingK.state.uiVisible) HealingK.ui.showUI();
         break;
       }
       /* ------------------------------------------ */
       case YT.PlayerState.PAUSED: // 기존 코드 유지
+            this.stopAudioFadeOut(); // 일시정지 시 페이드 아웃 중지
             HealingK.ui.hideLoading();
             HealingK.ui.stopProgressBarUpdate();
             clearTimeout(HealingK.state.uiTimeout);
@@ -1393,6 +1477,7 @@ HealingK.youtubeManager = {
       /* ------------------------------------------ */
       case YT.PlayerState.BUFFERING:{
         /* ★ 버퍼링 중 썸네일 다시 노출해 깜빡임 방지 */
+        this.stopAudioFadeOut(); // 버퍼링 시 페이드 아웃 중지
         const ph=HealingK.elements.hkVideoPlaceholder;
         if(ph)ph.classList.remove('hidden');
         HealingK.ui.showLoading();
@@ -1403,14 +1488,16 @@ HealingK.youtubeManager = {
       }
       /* ------------------------------------------ */
       case YT.PlayerState.CUED: // 기존 코드 유지
-            HealingK.ui.showLoading();
-            HealingK.ui.stopProgressBarUpdate();
-            if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+             this.stopAudioFadeOut(); // 대기 상태 시 페이드 아웃 중지
+             HealingK.ui.showLoading();
+             HealingK.ui.stopProgressBarUpdate();
+             if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
             clearTimeout(HealingK.state.uiTimeout);
             break;
       default: // 기존 코드 유지
-            HealingK.ui.stopProgressBarUpdate();
-            if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+             this.stopAudioFadeOut(); // 그 외 상태 변경 시 페이드 아웃 중지
+             HealingK.ui.stopProgressBarUpdate();
+             if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
             clearTimeout(HealingK.state.uiTimeout);
             break;
     }
@@ -1418,6 +1505,7 @@ HealingK.youtubeManager = {
   },
 
   onPlayerError(evt){ // 기존과 동일
+      this.stopAudioFadeOut(); // 에러 발생 시 페이드 아웃 중지
       console.error('YT Player Error:',evt.data, 'Video ID:', HealingK.state.player?.getVideoData?.()?.video_id);
       HealingK.ui.hideLoading();
        HealingK.state.isTransitioning = false;
@@ -1429,70 +1517,8 @@ HealingK.youtubeManager = {
         }
        HealingK.ui.stopProgressBarUpdate();
        if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-       // 에러 발생 시 페이드 아웃 모니터링 중지
-       this.stopFadeOut();
 
        HealingK.controller.playNextVideoWithAnimation();
-  },
-
-  /**
-   * 영상의 마지막 4초 동안 소리를 페이드 아웃합니다.
-   * requestAnimationFrame을 사용하여 부드러운 볼륨 조절을 수행합니다.
-   * @param {YT.Player} player YouTube Player 객체
-   */
-  startFadeOutMonitor(player) {
-    // 기존에 실행 중인 페이드 아웃 모니터링이 있다면 중지합니다.
-    this.stopFadeOut();
-
-    const checkAndFade = () => {
-      // 플레이어가 없거나 재생 중이 아니면 모니터링을 중지합니다.
-      if (!player || player.getPlayerState() !== YT.PlayerState.PLAYING) {
-        this.stopFadeOut();
-        return;
-      }
-
-      const duration = player.getDuration();
-      const currentTime = player.getCurrentTime();
-      const remainingTime = duration - currentTime;
-
-      // 영상의 마지막 FADE_DURATION (4초) 구간에 진입했는지 확인합니다.
-      if (remainingTime <= this.FADE_DURATION && remainingTime > 0) {
-        // 음소거 상태가 아니고 사운드가 활성화된 경우에만 페이드 아웃을 적용합니다.
-        if (!HealingK.state.isMuted && HealingK.state.soundEnabled) {
-          // 현재 볼륨을 기준으로 페이드 아웃을 시작합니다.
-          // originalVolume은 사용자가 설정한 기본 볼륨 또는 마지막으로 설정된 볼륨을 나타냅니다.
-          const targetVolume = (remainingTime / this.FADE_DURATION) * HealingK.state.originalVolume;
-          // 볼륨을 0에서 originalVolume 사이로 유지하며, 현재 볼륨보다 낮아지지 않도록 합니다.
-          player.setVolume(Math.max(0, Math.min(player.getVolume(), targetVolume)));
-        }
-      } else if (remainingTime <= 0) {
-        // 영상이 거의 끝났거나 끝났을 경우, 페이드 아웃을 중지합니다.
-        this.stopFadeOut();
-        // 다음 영상 재생을 위해 볼륨을 원래대로 되돌립니다 (음소거 상태가 아니라면).
-        if (!HealingK.state.isMuted && HealingK.state.soundEnabled) {
-            player.setVolume(HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100);
-        }
-      } else {
-        // 페이드 아웃 구간이 아닐 경우, 볼륨을 원래대로 유지합니다.
-        if (!HealingK.state.isMuted && HealingK.state.soundEnabled) {
-          player.setVolume(HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100);
-        }
-      }
-      // 다음 프레임에서 다시 checkAndFade 함수를 호출합니다.
-      this.fadeInterval = requestAnimationFrame(checkAndFade);
-    };
-    // 첫 번째 프레임 요청으로 페이드 아웃 모니터링을 시작합니다.
-    this.fadeInterval = requestAnimationFrame(checkAndFade);
-  },
-
-  /**
-   * 진행 중인 오디오 페이드 아웃을 중지합니다.
-   */
-  stopFadeOut() {
-    if (this.fadeInterval) {
-      cancelAnimationFrame(this.fadeInterval);
-      this.fadeInterval = null;
-    }
   },
 
   /************ 썸네일 프리로드 *****************************/
@@ -1536,18 +1562,18 @@ HealingK.controller = {
     }
   },
   switchVideo(idx, animationDirection = 'none'){
-      if (HealingK.state.isTransitioning && animationDirection !== 'none') {
-          return;
-      }
+     if (HealingK.state.isTransitioning && animationDirection !== 'none') {
+         return;
+     }
 
     const cat=HealingK.dataManager.getCurrentCategory();
     if(!cat || cat.videos.length===0 || idx<0 || idx>=cat.videos.length) {
-      HealingK.state.isTransitioning = false;
-      HealingK.ui.hideLoading();
-      if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-      HealingK.progressBar.updateTooltip(0,0);
-      if (cat && cat.category === "MY앨범") HealingK.ui.showMessage('MY앨범 목록에 더 이상 영상이 없습니다.', 1500);
-      return;
+        HealingK.state.isTransitioning = false;
+        HealingK.ui.hideLoading();
+        if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+        HealingK.progressBar.updateTooltip(0,0);
+        if (cat && cat.category === "MY앨범") HealingK.ui.showMessage('MY앨범 목록에 더 이상 영상이 없습니다.', 1500);
+        return;
     }
     const currentVideo = HealingK.dataManager.getCurrentVideo();
     if (currentVideo && cat.videos[idx] && currentVideo.id === cat.videos[idx].id) {
@@ -1567,9 +1593,9 @@ HealingK.controller = {
   },
   loadCurrentVideo(animationDirection = 'none'){
     if (animationDirection !== 'none') {
-          HealingK.state.isTransitioning = true;
+         HealingK.state.isTransitioning = true;
     } else {
-          HealingK.state.isTransitioning = false;
+         HealingK.state.isTransitioning = false;
     }
 
     const vid=HealingK.dataManager.getCurrentVideo();
@@ -1668,20 +1694,20 @@ HealingK.controller = {
     const totalCategories = videoData.length + 1;
     let prevCatIndex = (HealingK.state.currentCategoryIndex - 1 + totalCategories) % totalCategories;
     if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0) {
-          if (totalCategories > 1) {
-              prevCatIndex = (prevCatIndex - 1 + totalCategories) % totalCategories;
-              if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0 && totalCategories > 1) {
-                  prevCatIndex = totalCategories - 2;
-              } else if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0 && totalCategories === 1) {
-                   HealingK.ui.showMessage('MY앨범 목록이 비어있어 다른 카테고리로 이동할 수 없습니다.', 1500);
-                   return;
-              }
-              HealingK.ui.showMessage('MY앨범 목록이 비어있어 건너뜁니다.', 1500);
+         if (totalCategories > 1) {
+             prevCatIndex = (prevCatIndex - 1 + totalCategories) % totalCategories;
+             if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0 && totalCategories > 1) {
+                 prevCatIndex = totalCategories - 2;
+             } else if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0 && totalCategories === 1) {
+                  HealingK.ui.showMessage('MY앨범 목록이 비어있어 다른 카테고리로 이동할 수 없습니다.', 1500);
+                  return;
+             }
+             HealingK.ui.showMessage('MY앨범 목록이 비어있어 건너뜁니다.', 1500);
 
-          } else {
-               HealingK.ui.showMessage('MY앨범 목록이 비어있어 다른 카테고리로 이동할 수 없습니다.', 1500);
-               return;
-          }
+         } else {
+              HealingK.ui.showMessage('MY앨범 목록이 비어있어 다른 카테고리로 이동할 수 없습니다.', 1500);
+              return;
+         }
     }
     this.switchCategory(prevCatIndex);
   },
@@ -1704,61 +1730,67 @@ HealingK.controller = {
     HealingK.state.isMuted=false;
     if(HealingK.state.player&&HealingK.state.isPlayerReady&&!HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
         HealingK.state.player.unMute();
-        if (HealingK.state.originalVolume !== undefined) {
-            HealingK.state.player.setVolume(HealingK.state.originalVolume);
-        } else {
-            HealingK.state.player.setVolume(100);
+        // originalVolume으로 볼륨 설정 (기본 100)
+        HealingK.state.player.setVolume(HealingK.state.originalVolume);
+        // 플레이어가 재생 중이면 페이드 아웃 체크 다시 시작
+        if (HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+            HealingK.youtubeManager.startAudioFadeOutCheck();
         }
     }
     if (HealingK.elements.hkSoundToggle) HealingK.elements.hkSoundToggle.classList.add('hidden');
     HealingK.ui.updateBottomNav();
     HealingK.ui.showCenterMuteStatus(false);
-      HealingK.ui.showUI();
+     HealingK.ui.showUI();
   },
   toggleMute(){
     if(!HealingK.state.soundEnabled){this.enableSound();return;}
     HealingK.state.isMuted=!HealingK.state.isMuted;
     if(HealingK.state.player&&HealingK.state.isPlayerReady){
-      if(HealingK.state.isMuted)HealingK.state.player.mute();
+      if(HealingK.state.isMuted) {
+          HealingK.state.player.mute();
+          HealingK.youtubeManager.stopAudioFadeOut(); // 음소거 시 페이드 아웃 중지
+      }
       else {
           if(!HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
              HealingK.state.player.unMute();
-             if (HealingK.state.originalVolume !== undefined) {
-                 HealingK.state.player.setVolume(HealingK.state.originalVolume);
-             } else {
-                 HealingK.state.player.setVolume(100);
+             // originalVolume으로 볼륨 설정 (기본 100)
+             HealingK.state.player.setVolume(HealingK.state.originalVolume);
+             // 플레이어가 재생 중이면 페이드 아웃 체크 다시 시작
+             if (HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+                HealingK.youtubeManager.startAudioFadeOutCheck();
              }
           } else {
-              HealingK.state.player.mute();
+              HealingK.state.player.mute(); // 패널/모달이 열려있으면 음소거 유지
+              HealingK.youtubeManager.stopAudioFadeOut(); // 패널/모달 때문에 음소거된 경우 페이드 아웃 중지
           }
       }
     }
     HealingK.ui.updateBottomNav();
     HealingK.ui.showCenterMuteStatus(HealingK.state.isMuted);
-      HealingK.ui.showUI();
+     HealingK.ui.showUI();
   },
   togglePlayPause(){
     if(HealingK.state.player?.getPlayerState){
         const pS=HealingK.state.player.getPlayerState();
         if(pS===YT.PlayerState.PLAYING)HealingK.state.player.pauseVideo();
-        else if(pS===YT.PlayerState.PAUSED)HealingK.state.player.playVideo();
+        else if(pS===YT.PlayerState.PAUSED)HealingK.state.player.playVideo(); 
         else if (pS === YT.PlayerState.ENDED) {
             HealingK.state.player.seekTo(0);
             HealingK.state.player.playVideo();
         } else if (pS === YT.PlayerState.CUED) {
             HealingK.state.player.playVideo();
         }
-          HealingK.ui.showUI();
+         HealingK.ui.showUI();
     }
   },
   toggleBookmark(){
     const cV=HealingK.dataManager.getCurrentVideo();
     if(cV)HealingK.dataManager.toggleBookmark(cV.id);
-      HealingK.ui.showUI();
+     HealingK.ui.showUI();
   },
-    clearAllBookmarks() {
-        HealingK.dataManager.clearAllBookmarks();
-    },
+   clearAllBookmarks() {
+       HealingK.dataManager.clearAllBookmarks();
+   },
   goToBlogPost() {
     if (BLOG_POST_URL === "https://healingk.com" || !BLOG_POST_URL || BLOG_POST_URL === "#") {
         window.location.href = "https://healingk.com";
