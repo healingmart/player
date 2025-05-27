@@ -1,8 +1,4 @@
 
-// video-data.js 파일 내용 시작
-
-const BLOG_POST_URL = "https://healingk.com";
-const HELP_MORE_URL = "https://healingk.com/player-help";
 
 const videoData = [
   {
@@ -54,7 +50,3 @@ const videoData = [
     ]
   }
 ];
-
-const MY_ALBUM_CATEGORY_INDEX = videoData.length;
-
-// video-data.js 파일 내용 끝
