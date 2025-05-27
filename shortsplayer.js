@@ -1,5 +1,4 @@
-// GitHub의 "shortsplayer.js" 파일의 전체 내용:
-// 이 파일은 플레이어에 필요한 데이터를 정의합니다.
+// GitHub의 "healingmart/player" 레포지토리 내 "video-data.js" 파일의 내용
 
 const BLOG_POST_URL = "https://healingk.com";
 const HELP_MORE_URL = "https://healingk.com/player-help";
