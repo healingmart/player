@@ -38,14 +38,25 @@ centerMuteStatusVisible: false,
 
 centerMuteStatusTimeout: null,
 
-originalVolume: 100, // 사용자가 선호하는 볼륨 (음소거 해제 시 적용)
+originalVolume: 100,
 
 uiAutoTimeoutDuration: 3000,
 
 recentSearches: [],
 
 isDraggingProgressBar: false, // 진행바 드래그 상태 추가
-fadeInterval: null // 오디오 페이드 인/아웃을 위한 인터벌 ID
+
+// --- 페이드 관련 상태 변수 추가 ---
+fadeOutInProgress: false,
+fadeRAF: null,
+fadeStartVolume: 100,
+fadeTargetVolume: 0,
+fadeDuration: 4000, // 4초 페이드 아웃
+fadeInDuration: 500, // 현재 사용되지 않지만, 혹시 모를 미래를 위해 유지
+fadeStartTime: null,
+fadeCallback: null,
+fadeFinalMute: false, // 페이드 완료 후 최종 음소거 여부
+
 },
 
 elements: {},
@@ -694,13 +705,13 @@ HealingK.state.isDraggingProgressBar = true; // 전역 상태 업데이트
 
 this.handleSeek(event);
 
-// // 드래그 중에는 영상 일시정지 (선택 사항)
+// 드래그 중에는 영상 일시정지 (선택 사항)
 
-// // if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
+// if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PLAYING) {
 
 // //     HealingK.state.player.pauseVideo();
 
-// // }
+// }
 
 };
 
@@ -750,13 +761,13 @@ isDragging = false;
 
 HealingK.state.isDraggingProgressBar = false; // 전역 상태 업데이트
 
-// // 드래그 종료 후 영상 다시 재생 (선택 사항)
+// 드래그 종료 후 영상 다시 재생 (선택 사항)
 
-// // if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PAUSED) {
+// if (HealingK.state.player && HealingK.state.player.getPlayerState() === YT.PlayerState.PAUSED) {
 
 // //     HealingK.state.player.playVideo();
 
-// // }
+// }
 
 }
 
@@ -786,7 +797,7 @@ const duration = HealingK.state.player.getDuration();
 
 // 마우스 진입 시 툴팁 표시 (내용은 mousemove에서 업데이트)
 
-// // HealingK.elements.hkProgressBarTooltip.classList.add('visible'); // CSS :hover로 처리
+// HealingK.elements.hkProgressBarTooltip.classList.add('visible'); // CSS :hover로 처리
 
 if (duration > 0) {
 
@@ -804,7 +815,7 @@ progressBarContainer.addEventListener('mouseleave', () => {
 
 if (HealingK.elements.hkProgressBarTooltip && !isDragging) { // 드래그 중이 아닐 때만 숨김
 
-// // HealingK.elements.hkProgressBarTooltip.classList.remove('visible'); // CSS :hover로 처리
+// HealingK.elements.hkProgressBarTooltip.classList.remove('visible'); // CSS :hover로 처리
 
 }
 
@@ -904,39 +915,102 @@ element.addEventListener('click', callback);
 
 },
 
-fadeVolume(player, targetVolume, duration, finalMuteState = null) {
-    if (!player || !HealingK.state.isPlayerReady) return;
+// --- 페이드 관련 함수 추가/수정 ---
+fadeVolume(targetVolume, duration, callback = null, finalMute = false) {
+  // 이미 진행 중인 페이드가 있다면 취소
+  if (HealingK.state.fadeRAF) {
+    cancelAnimationFrame(HealingK.state.fadeRAF);
+    HealingK.state.fadeRAF = null;
+  }
 
-    if (HealingK.state.fadeInterval) {
-        clearInterval(HealingK.state.fadeInterval);
-        HealingK.state.fadeInterval = null;
+  const player = HealingK.state.player;
+  if (!player || !HealingK.state.isPlayerReady) {
+    if (callback) callback();
+    return;
+  }
+
+  HealingK.state.fadeOutInProgress = true;
+  HealingK.state.fadeStartTime = performance.now();
+  HealingK.state.fadeStartVolume = player.getVolume();
+  HealingK.state.fadeTargetVolume = targetVolume;
+  HealingK.state.fadeCallback = callback;
+  HealingK.state.fadeFinalMute = finalMute;
+
+  // 이미 목표 볼륨이라면 즉시 완료
+  if (Math.abs(HealingK.state.fadeStartVolume - targetVolume) < 1) {
+    this._completeFade();
+    return;
+  }
+
+  const animate = (timestamp) => {
+    const elapsed = timestamp - HealingK.state.fadeStartTime;
+    const progress = Math.min(elapsed / duration, 1);
+
+    let factor;
+    if (HealingK.state.fadeStartVolume < targetVolume) {
+      // 페이드 인 (현재는 사용 안 함)
+      factor = Math.pow(progress, 2);
+    } else {
+      // 페이드 아웃
+      factor = 1 - Math.pow(1 - progress, 2);
     }
 
-    const startVolume = player.getVolume();
-    const range = targetVolume - startVolume;
-    const steps = duration / 50; // Update every 50ms for smooth fade
-    let currentStep = 0;
+    const newVolume = HealingK.state.fadeStartVolume + factor * (targetVolume - HealingK.state.fadeStartVolume);
+    player.setVolume(Math.round(newVolume));
 
-    HealingK.state.fadeInterval = setInterval(() => {
-        currentStep++;
-        const newVolume = startVolume + (range * (currentStep / steps));
+    if (progress < 1) {
+      HealingK.state.fadeRAF = requestAnimationFrame(animate);
+    } else {
+      this._completeFade();
+    }
+  };
 
-        if ((range > 0 && newVolume >= targetVolume) || (range < 0 && newVolume <= targetVolume) || currentStep >= steps) {
-            player.setVolume(targetVolume);
-            if (finalMuteState !== null) {
-                if (finalMuteState) { // true means mute
-                    player.mute();
-                } else { // false means unmute
-                    player.unMute();
-                }
-            }
-            clearInterval(HealingK.state.fadeInterval);
-            HealingK.state.fadeInterval = null;
-            return;
+  HealingK.state.fadeRAF = requestAnimationFrame(animate);
+},
+
+_completeFade() {
+  const player = HealingK.state.player;
+  if (player && HealingK.state.isPlayerReady) {
+    player.setVolume(HealingK.state.fadeTargetVolume);
+    if (HealingK.state.fadeFinalMute) {
+      player.mute(); // 페이드 아웃 완료 후 최종 음소거
+    } else {
+      // 최종 음소거가 아니라면, 사용자의 음소거 상태를 따름
+      if (HealingK.state.isMuted) {
+        player.mute();
+      } else if (HealingK.state.soundEnabled) {
+        player.unMute();
+        // 원래 볼륨으로 복원
+        if (HealingK.state.originalVolume !== undefined) {
+          player.setVolume(HealingK.state.originalVolume);
+        } else {
+          player.setVolume(100);
         }
-        player.setVolume(newVolume);
-    }, 50);
+      }
+    }
+  }
+
+  HealingK.state.fadeOutInProgress = false;
+  HealingK.state.fadeRAF = null;
+  HealingK.state.fadeFinalMute = false; // 상태 초기화
+
+  if (typeof HealingK.state.fadeCallback === 'function') {
+    const callback = HealingK.state.fadeCallback;
+    HealingK.state.fadeCallback = null;
+    callback();
+  }
+},
+
+cancelFade() {
+  if (HealingK.state.fadeRAF) {
+    cancelAnimationFrame(HealingK.state.fadeRAF);
+    HealingK.state.fadeRAF = null;
+  }
+  HealingK.state.fadeOutInProgress = false;
+  HealingK.state.fadeCallback = null;
+  HealingK.state.fadeFinalMute = false;
 }
+
 };
 
 HealingK.search = {
@@ -1125,6 +1199,8 @@ HealingK.controller.loadCurrentVideo('none');
 
 }
 
+}
+
 },
 
 isBookmarked: (vId) => HealingK.state.bookmarkedVideos.includes(vId),
@@ -1175,7 +1251,7 @@ generateShareUrl() {
 
 const currentVideo = HealingK.dataManager.getCurrentVideo();
 
-const baseUrl = BLOG_POST_URL.replace(/\/+$/, '') + '/?'; // BLOG_POST_URL은 video-data.js에서 정의
+const baseUrl = BLOG_POST_URL.replace(/\/+$/, '') + '/? '; // BLOG_POST_URL은 video-data.js에서 정의
 
 if (currentVideo) {
 
@@ -1518,110 +1594,72 @@ HealingK.elements.hkRecentSearches.style.display = 'none';
 },
 
 togglePanel(mode = null) {
-
-const { state, elements } = HealingK;
-
-clearTimeout(state.panelCloseTimeout); state.panelCloseTimeout = null;
-
-const isCurrentlyVisible = state.isPanelVisible;
-
-const requestedMode = mode || state.panelMode;
-
-let shouldBeVisible = !isCurrentlyVisible;
-
-if (mode) {
-
-if (isCurrentlyVisible && state.panelMode === mode && !state.openedByHover) {
-
-shouldBeVisible = false;
-
-} else {
-
-shouldBeVisible = true;
-
-state.panelMode = mode;
-
-}
-
-}
-
-if (!shouldBeVisible) state.openedByHover = false;
-
-state.isPanelVisible = shouldBeVisible;
-
-elements.body.classList.toggle('panel-open', shouldBeVisible);
-
-elements.hkSidePanel.classList.toggle('active', shouldBeVisible);
-
-if (!shouldBeVisible) {
-
-if (elements.hkSearchInput) elements.hkSearchInput.blur();
-
-this.toggleRecentSearches(false);
-
-if (state.panelMode === 'search') {
-
-if (elements.hkSearchInput) {
-
-elements.hkSearchInput.value = '';
-
-}
-
-if (elements.hkSearchClear) {
-
-elements.hkSearchClear.style.display = 'none';
-
-}
-
-HealingK.search.performSearch('');
-
-}
-
-}
-
-if (elements.hkPanelClose) {
-
-elements.hkSidePanel.setAttribute('data-mode', shouldBeVisible ? state.panelMode : '');
-
-elements.hkPanelClose.style.display = shouldBeVisible ? 'flex' : 'none';
-
-}
-
-if (shouldBeVisible) {
+  HealingK.utils.cancelFade(); // 진행 중인 페이드 취소
+  const { state, elements } = HealingK;
+  clearTimeout(state.panelCloseTimeout); state.panelCloseTimeout = null;
+  const isCurrentlyVisible = state.isPanelVisible;
+  const requestedMode = mode || state.panelMode;
+  let shouldBeVisible = !isCurrentlyVisible;
+  if (mode) {
+    if (isCurrentlyVisible && state.panelMode === mode && !state.openedByHover) {
+      shouldBeVisible = false;
+    } else {
+      shouldBeVisible = true;
+      state.panelMode = mode;
+    }
+  }
+  if (!shouldBeVisible) state.openedByHover = false;
+  state.isPanelVisible = shouldBeVisible;
+  elements.body.classList.toggle('panel-open', shouldBeVisible);
+  elements.hkSidePanel.classList.toggle('active', shouldBeVisible);
+  if (!shouldBeVisible) {
+    if (elements.hkSearchInput) elements.hkSearchInput.blur();
+    this.toggleRecentSearches(false);
+    if (state.panelMode === 'search') {
+      if (elements.hkSearchInput) {
+        elements.hkSearchInput.value = '';
+      }
+      if (elements.hkSearchClear) {
+        elements.hkSearchClear.style.display = 'none';
+      }
+      HealingK.search.performSearch('');
+    }
+  }
+  if (elements.hkPanelClose) {
+    elements.hkSidePanel.setAttribute('data-mode', shouldBeVisible ? state.panelMode : '');
+    elements.hkPanelClose.style.display = shouldBeVisible ? 'flex' : 'none';
+  }
+  if (shouldBeVisible) {
     if (state.player && state.isPlayerReady) {
-        state.originalVolume = state.player.getVolume(); // 현재 볼륨을 저장
-        HealingK.utils.fadeVolume(state.player, 0, 4000, true); // 4초 페이드 아웃 후 음소거
+      state.originalVolume = state.player.getVolume();
+      state.player.mute(); // 패널 열 때 즉시 음소거
     }
     this.hideUI();
     clearTimeout(HealingK.state.uiTimeout);
     if (state.panelMode === 'search') {
-        elements.hkPanelTitle.innerHTML='🔍 검색';
-        elements.hkSearchElements.style.display='block';
-        if (elements.hkMyAlbumControls) elements.hkMyAlbumControls.style.display = 'none';
+      elements.hkPanelTitle.innerHTML='🔍 검색';
+      elements.hkSearchElements.style.display='block';
+      if (elements.hkMyAlbumControls) elements.hkMyAlbumControls.style.display = 'none';
     } else {
-        elements.hkPanelTitle.innerHTML = (state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) ? '❤️ MY앨범' : '📋 재생목록';
-        elements.hkSearchElements.style.display='none';
-        if (HealingK.elements.hkMyAlbumControls) {
-            this.state.panelMode === 'thumbnail' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX
-            ? HealingK.elements.hkMyAlbumControls.style.display = 'flex'
-            : HealingK.elements.hkMyAlbumControls.style.display = 'none';
-        }
+      elements.hkPanelTitle.innerHTML = (state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) ? '❤️ MY앨범' : '📋 재생목록';
+      elements.hkSearchElements.style.display='none';
+      if (HealingK.elements.hkMyAlbumControls) {
+        this.state.panelMode === 'thumbnail' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX
+        ? HealingK.elements.hkMyAlbumControls.style.display = 'flex'
+        : HealingK.elements.hkMyAlbumControls.style.display = 'none';
+      }
     }
     this.renderActiveGrid();
-} else {
-    // 패널 닫을 때 (음소거 상태가 아니었고, 소리가 활성화되어 있었다면)
+  } else {
     if (state.player && state.isPlayerReady && state.soundEnabled && !state.isMuted) {
-        state.player.unMute(); // 즉시 음소거 해제
-        // 현재 볼륨을 0으로 설정하고 원래 볼륨으로 페이드 인
-        state.player.setVolume(0);
-        HealingK.utils.fadeVolume(state.player, state.originalVolume !== undefined ? state.originalVolume : 100, 500, false);
+      state.player.unMute(); // 패널 닫을 때 즉시 음소거 해제
+      if (state.originalVolume !== undefined) state.player.setVolume(state.originalVolume);
     } else if (state.player && state.isPlayerReady) {
-        // 소리가 비활성화되었거나 음소거 상태였다면 계속 음소거 유지
-        state.player.mute();
+      state.player.mute();
     }
     this.showUI();
-}
-this.updateBottomNav();
+  }
+  this.updateBottomNav();
 },
 
 updateIndicator(){
@@ -1889,85 +1927,61 @@ HealingK.elements.hkLoading.style.display = 'none';
 },
 
 toggleHelpModal() {
-
-HealingK.state.isHelpModalVisible = !HealingK.state.isHelpModalVisible;
-
-if (HealingK.elements.hkHelpModal) {
-
-HealingK.elements.hkHelpModal.classList.toggle('active', HealingK.state.isHelpModalVisible);
-
-}
-
-HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isHelpModalVisible);
-
-if (HealingK.state.isHelpModalVisible) {
+  HealingK.utils.cancelFade(); // 진행 중인 페이드 취소
+  HealingK.state.isHelpModalVisible = !HealingK.state.isHelpModalVisible;
+  if (HealingK.elements.hkHelpModal) {
+    HealingK.elements.hkHelpModal.classList.toggle('active', HealingK.state.isHelpModalVisible);
+  }
+  HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isHelpModalVisible);
+  if (HealingK.state.isHelpModalVisible) {
     if (HealingK.state.player && HealingK.state.isPlayerReady) {
-        HealingK.state.originalVolume = HealingK.state.player.getVolume(); // 현재 볼륨 저장
-        HealingK.utils.fadeVolume(HealingK.state.player, 0, 4000, true); // 4초 페이드 아웃 후 음소거
+      HealingK.state.originalVolume = HealingK.state.player.getVolume();
+      HealingK.state.player.mute(); // 모달 열 때 즉시 음소거
     }
     this.hideUI();
     clearTimeout(HealingK.state.uiTimeout);
-} else {
-    // 모달 닫을 때 (음소거 상태가 아니었고, 소리가 활성화되어 있었다면)
+  } else {
     if (HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.soundEnabled && !HealingK.state.isMuted) {
-        HealingK.state.player.unMute(); // 즉시 음소거 해제
-        // 현재 볼륨을 0으로 설정하고 원래 볼륨으로 페이드 인
-        HealingK.state.player.setVolume(0);
-        HealingK.utils.fadeVolume(HealingK.state.player, HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100, 500, false);
+      HealingK.state.player.unMute(); // 모달 닫을 때 즉시 음소거 해제
+      if (HealingK.state.originalVolume !== undefined) HealingK.state.player.setVolume(HealingK.state.originalVolume);
     } else if (HealingK.state.player && HealingK.state.isPlayerReady) {
-        // 소리가 비활성화되었거나 음소거 상태였다면 계속 음소거 유지
-        HealingK.state.player.mute();
+      HealingK.state.player.mute();
     }
     this.showUI();
-}
-this.updateBottomNav();
+  }
+  this.updateBottomNav();
 },
 
 toggleShareModal() {
-
-HealingK.state.isShareModalVisible = !HealingK.state.isShareModalVisible;
-
-if (HealingK.elements.hkShareModal) {
-
-if (HealingK.state.isShareModalVisible) {
-
-const shareUrl = HealingK.share.generateShareUrl();
-
-if (HealingK.elements.hkShareUrl) HealingK.elements.hkShareUrl.value = shareUrl;
-
-if (navigator.share && HealingK.elements.hkShareNative) HealingK.elements.hkShareNative.style.display = 'inline-block';
-
-else if (HealingK.elements.hkShareNative) HealingK.elements.hkShareNative.style.display = 'none';
-
-}
-
-HealingK.elements.hkShareModal.classList.toggle('active', HealingK.state.isShareModalVisible);
-
-}
-
-HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isShareModalVisible);
-
-if (HealingK.state.isShareModalVisible) {
+  HealingK.utils.cancelFade(); // 진행 중인 페이드 취소
+  HealingK.state.isShareModalVisible = !HealingK.state.isShareModalVisible;
+  if (HealingK.elements.hkShareModal) {
+    if (HealingK.state.isShareModalVisible) {
+      const shareUrl = HealingK.share.generateShareUrl();
+      if (HealingK.elements.hkShareUrl) HealingK.elements.hkShareUrl.value = shareUrl;
+      if (navigator.share && HealingK.elements.hkShareNative) HealingK.elements.hkShareNative.style.display = 'inline-block';
+      else if (HealingK.elements.hkShareNative) HealingK.elements.hkShareNative.style.display = 'none';
+    }
+    HealingK.elements.hkShareModal.classList.toggle('active', HealingK.state.isShareModalVisible);
+  }
+  HealingK.elements.body.classList.toggle('modal-open', HealingK.state.isShareModalVisible);
+  if (HealingK.state.isShareModalVisible) {
     if (HealingK.state.player && HealingK.state.isPlayerReady) {
-        HealingK.state.originalVolume = HealingK.state.player.getVolume(); // 현재 볼륨 저장
-        HealingK.utils.fadeVolume(HealingK.state.player, 0, 4000, true); // 4초 페이드 아웃 후 음소거
+      HealingK.state.originalVolume = HealingK.state.player.getVolume();
+      HealingK.state.player.mute(); // 모달 열 때 즉시 음소거
     }
     this.hideUI();
     clearTimeout(HealingK.state.uiTimeout);
-} else {
-    // 모달 닫을 때 (음소거 상태가 아니었고, 소리가 활성화되어 있었다면)
+  } else {
     if (HealingK.state.player && HealingK.state.isPlayerReady && HealingK.state.soundEnabled && !HealingK.state.isMuted) {
-        HealingK.state.player.unMute(); // 즉시 음소거 해제
-        // 현재 볼륨을 0으로 설정하고 원래 볼륨으로 페이드 인
-        HealingK.state.player.setVolume(0);
-        HealingK.utils.fadeVolume(HealingK.state.player, HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100, 500, false);
+      HealingK.state.player.unMute(); // 모달 닫을 때 즉시 음소거 해제
+      if (HealingK.state.originalVolume !== undefined) HealingK.state.player.setVolume(HealingK.state.originalVolume);
     } else if (HealingK.state.player && HealingK.state.isPlayerReady) {
-        // 소리가 비활성화되었거나 음소거 상태였다면 계속 음소거 유지
-        HealingK.state.player.mute();
+      HealingK.state.player.mute();
     }
     this.showUI();
-}
-this.updateBottomNav();
+  }
+  this.updateBottomNav();
 },
 
 showMessage(message, duration = 2000) {
@@ -2054,7 +2068,7 @@ HealingK.elements.hkProgressBarFill.style.width = percentage + '%';
 
 // 재생 중 툴팁 업데이트 (현재 시간, 총 시간) - 마우스 호버가 아닐 때도 필요하면 여기서 호출
 
-// // HealingK.progressBar.updateTooltip(currentTime, duration); // 실시간 툴팁 원하면 활성화, 단 마우스 위치 기반은 아님
+// HealingK.progressBar.updateTooltip(currentTime, duration); // 실시간 툴팁 원하면 활성화, 단 마우스 위치 기반은 아님
 
 } else {
 
@@ -2173,24 +2187,35 @@ events:{onReady:(e)=>this.onPlayerReady(e, animationDirection),onStateChange:(e)
 },
 
 onPlayerReady(evt, animationDirection){ // 기존과 동일
-    HealingK.state.isPlayerReady=true;
 
-    // originalVolume이 설정되지 않았거나 0이었다면 기본값 100으로 설정
-    if (HealingK.state.originalVolume === undefined || HealingK.state.originalVolume === 0) {
-        HealingK.state.originalVolume = 100;
-    }
+HealingK.state.isPlayerReady=true;
 
-    if (HealingK.state.isMuted || !HealingK.state.soundEnabled || HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible) {
-        evt.target.setVolume(0); // 볼륨을 0으로 설정
-        evt.target.mute(); // 명시적으로 음소거
-    } else {
-        evt.target.unMute(); // 음소거 해제
-        evt.target.setVolume(HealingK.state.originalVolume); // 저장된 볼륨으로 설정
-    }
+if (HealingK.state.isMuted || !HealingK.state.soundEnabled || HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible) {
 
-    if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-    const duration = evt.target.getDuration();
-    HealingK.progressBar.updateTooltip(0, duration);
+evt.target.mute();
+
+} else {
+
+evt.target.unMute();
+
+}
+
+if (HealingK.state.originalVolume !== undefined) {
+
+evt.target.setVolume(HealingK.state.originalVolume);
+
+} else {
+
+evt.target.setVolume(100);
+
+}
+
+if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+
+const duration = evt.target.getDuration();
+
+HealingK.progressBar.updateTooltip(0, duration);
+
 },
 
 /************ loadVideo : 썸네일 먼저 띄우기 ********************/
@@ -2368,24 +2393,17 @@ iframe.setAttribute('src', src);
 switch(playerState){
 
 case YT.PlayerState.ENDED: // 기존 코드 유지
-
-if (!HealingK.state.isTransitioning) {
-
-HealingK.ui.showLoading();
-
-}
-
-HealingK.ui.stopProgressBarUpdate();
-
-if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '100%';
-
-setTimeout(() => {
-
-HealingK.controller.playNextVideoWithAnimation();
-
-}, 100);
-
-break;
+  // 페이드 아웃이 진행 중이었다면 취소하고 다음 영상 재생
+  HealingK.utils.cancelFade();
+  if (!HealingK.state.isTransitioning) {
+    HealingK.ui.showLoading();
+  }
+  HealingK.ui.stopProgressBarUpdate();
+  if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '100%';
+  setTimeout(() => {
+    HealingK.controller.playNextVideoWithAnimation();
+  }, 100);
+  break;
 
 /* ------------------------------------------ */
 
@@ -2453,21 +2471,22 @@ HealingK.ui.hideLoading();
 
 HealingK.ui.startProgressBarUpdate();
 
-// 음소거 상태를 유지하거나 패널/모달이 열려있다면 음소거 유지
-if(HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible || !HealingK.state.soundEnabled || HealingK.state.isMuted) {
-    evt.target.setVolume(0); // 볼륨 0으로 설정
-    evt.target.mute(); // 명시적으로 음소거
+if(HealingK.state.isPanelVisible||HealingK.state.isHelpModalVisible||HealingK.state.isShareModalVisible || !HealingK.state.soundEnabled||HealingK.state.isMuted)evt.target.mute();
+
+else {
+
+if (HealingK.state.originalVolume !== undefined) {
+
+evt.target.setVolume(HealingK.state.originalVolume);
+
 } else {
-    // 음소거 상태가 아니었다면 원래 볼륨으로 설정 (페이드 인은 이미 토글 함수에서 처리)
-    evt.target.unMute();
-    const targetVol = HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100;
-    // 볼륨이 타겟 볼륨보다 현저히 낮거나 음소거 상태에서 풀렸다면 페이드 인 시작
-    if (evt.target.getVolume() < targetVol - 5 || evt.target.isMuted()) {
-        evt.target.setVolume(0); // 0부터 시작하여 페이드 인
-        HealingK.utils.fadeVolume(evt.target, targetVol, 500, false);
-    } else {
-        evt.target.setVolume(targetVol); // 이미 충분히 높다면 바로 설정
-    }
+
+evt.target.setVolume(100);
+
+}
+
+evt.target.unMute();
+
 }
 
 if (HealingK.state.uiVisible) HealingK.ui.showUI();
@@ -2773,67 +2792,57 @@ HealingK.ui.showMessage('요청하신 영상을 찾을 수 없습니다. ', 2000
 },
 
 playNextVideoWithAnimation() {
+  if (HealingK.state.isTransitioning) {
+    return;
+  }
+  const cat = HealingK.dataManager.getCurrentCategory();
+  if (!cat || cat.videos.length === 0) {
+    HealingK.state.isTransitioning = false;
+    HealingK.ui.hideLoading();
+    if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+    HealingK.progressBar.updateTooltip(0,0);
+    if (cat && cat.category === "MY앨범") HealingK.ui.showMessage('MY앨범 목록에 더 이상 영상이 없습니다. ', 1500);
+    return;
+  }
 
-if (HealingK.state.isTransitioning) {
-
-return;
-
-}
-
-const cat = HealingK.dataManager.getCurrentCategory();
-
-if (!cat || cat.videos.length === 0) {
-
-HealingK.state.isTransitioning = false;
-
-HealingK.ui.hideLoading();
-
-if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-
-HealingK.progressBar.updateTooltip(0,0);
-
-if (cat && cat.category === "MY앨범") HealingK.ui.showMessage('MY앨범 목록에 더 이상 영상이 없습니다. ', 1500);
-
-return;
-
-}
-
-const nextIndex = (HealingK.state.currentVideoIndex + 1) % cat.videos.length;
-
-this.switchVideo(nextIndex, 'fromBottom');
-
+  // 4초 페이드 아웃 적용
+  if (HealingK.state.player && HealingK.state.isPlayerReady && !HealingK.state.isMuted && HealingK.state.soundEnabled) {
+    HealingK.utils.fadeVolume(0, HealingK.state.fadeDuration, () => {
+      const nextIndex = (HealingK.state.currentVideoIndex + 1) % cat.videos.length;
+      this.switchVideo(nextIndex, 'fromBottom');
+    }, true); // finalMute = true: 페이드 아웃 완료 후 음소거
+  } else {
+    // 소리가 이미 꺼져 있거나 플레이어가 준비되지 않았으면 즉시 전환
+    const nextIndex = (HealingK.state.currentVideoIndex + 1) % cat.videos.length;
+    this.switchVideo(nextIndex, 'fromBottom');
+  }
 },
 
 playPrevVideoWithAnimation() {
+  if (HealingK.state.isTransitioning) {
+    return;
+  }
+  const cat = HealingK.dataManager.getCurrentCategory();
+  if (!cat || cat.videos.length === 0) {
+    HealingK.state.isTransitioning = false;
+    HealingK.ui.hideLoading();
+    if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+    HealingK.progressBar.updateTooltip(0,0);
+    if (cat && cat.category === "MY앨범") HealingK.ui.showMessage('MY앨범 목록에 더 이상 영상이 없습니다. ', 1500);
+    return;
+  }
 
-if (HealingK.state.isTransitioning) {
-
-return;
-
-}
-
-const cat = HealingK.dataManager.getCurrentCategory();
-
-if (!cat || cat.videos.length === 0) {
-
-HealingK.state.isTransitioning = false;
-
-HealingK.ui.hideLoading();
-
-if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-
-HealingK.progressBar.updateTooltip(0,0);
-
-if (cat && cat.category === "MY앨범") HealingK.ui.showMessage('MY앨범 목록에 더 이상 영상이 없습니다. ', 1500);
-
-return;
-
-}
-
-const prevIndex = (HealingK.state.currentVideoIndex - 1 + cat.videos.length) % cat.videos.length;
-
-this.switchVideo(prevIndex, 'fromTop');
-
+  // 4초 페이드 아웃 적용
+  if (HealingK.state.player && HealingK.state.isPlayerReady && !HealingK.state.isMuted && HealingK.state.soundEnabled) {
+    HealingK.utils.fadeVolume(0, HealingK.state.fadeDuration, () => {
+      const prevIndex = (HealingK.state.currentVideoIndex - 1 + cat.videos.length) % cat.videos.length;
+      this.switchVideo(prevIndex, 'fromTop');
+    }, true); // finalMute = true: 페이드 아웃 완료 후 음소거
+  } else {
+    // 소리가 이미 꺼져 있거나 플레이어가 준비되지 않았으면 즉시 전환
+    const prevIndex = (HealingK.state.currentVideoIndex - 1 + cat.videos.length) % cat.videos.length;
+    this.switchVideo(prevIndex, 'fromTop');
+  }
 },
 
 nextCategory(){
@@ -2961,52 +2970,45 @@ this.loadCurrentVideo('none');
 },
 
 enableSound(){
-
-HealingK.state.soundEnabled=true;
-
-HealingK.state.isMuted=false;
-
-if(HealingK.state.player&&HealingK.state.isPlayerReady&&!HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
-    // 즉시 음소거 해제 후 0부터 원래 볼륨까지 페이드 인
+  HealingK.utils.cancelFade(); // 진행 중인 페이드 취소
+  HealingK.state.soundEnabled=true;
+  HealingK.state.isMuted=false;
+  if(HealingK.state.player&&HealingK.state.isPlayerReady&&!HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
     HealingK.state.player.unMute();
-    HealingK.state.player.setVolume(0);
-    HealingK.utils.fadeVolume(HealingK.state.player, HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100, 500, false);
-}
-
-if (HealingK.elements.hkSoundToggle) HealingK.elements.hkSoundToggle.classList.add('hidden');
-
-HealingK.ui.updateBottomNav();
-
-HealingK.ui.showCenterMuteStatus(false);
-
-HealingK.ui.showUI();
-
+    if (HealingK.state.originalVolume !== undefined) {
+      HealingK.state.player.setVolume(HealingK.state.originalVolume);
+    } else {
+      HealingK.state.player.setVolume(100);
+    }
+  }
+  if (HealingK.elements.hkSoundToggle) HealingK.elements.hkSoundToggle.classList.add('hidden');
+  HealingK.ui.updateBottomNav();
+  HealingK.ui.showCenterMuteStatus(false);
+  HealingK.ui.showUI();
 },
 
 toggleMute(){
-
-if(!HealingK.state.soundEnabled){this.enableSound();return;}
-
-HealingK.state.isMuted=!HealingK.state.isMuted;
-
-if(HealingK.state.player&&HealingK.state.isPlayerReady){
-    if(HealingK.state.isMuted) {
-        // 음소거 시: 4초 페이드 아웃 후 음소거
-        HealingK.utils.fadeVolume(HealingK.state.player, 0, 4000, true);
-    } else {
-        // 음소거 해제 시: 즉시 음소거 해제 후 0.5초 페이드 인
+  HealingK.utils.cancelFade(); // 진행 중인 페이드 취소
+  if(!HealingK.state.soundEnabled){this.enableSound();return;}
+  HealingK.state.isMuted=!HealingK.state.isMuted;
+  if(HealingK.state.player&&HealingK.state.isPlayerReady){
+    if(HealingK.state.isMuted)HealingK.state.player.mute();
+    else {
+      if(!HealingK.state.isPanelVisible && !HealingK.state.isHelpModalVisible && !HealingK.state.isShareModalVisible){
         HealingK.state.player.unMute();
-        HealingK.state.player.setVolume(0); // 0부터 시작하여 페이드 인
-        HealingK.utils.fadeVolume(HealingK.state.player, HealingK.state.originalVolume !== undefined ? HealingK.state.originalVolume : 100, 500, false);
+        if (HealingK.state.originalVolume !== undefined) {
+          HealingK.state.player.setVolume(HealingK.state.originalVolume);
+        } else {
+          HealingK.state.player.setVolume(100);
+        }
+      } else {
+        HealingK.state.player.mute();
+      }
     }
-}
-
-HealingK.ui.updateBottomNav();
-
-HealingK.ui.showCenterMuteStatus(HealingK.state.isMuted);
-
-HealingK.ui.showUI();
-
+  }
+  HealingK.ui.updateBottomNav();
+  HealingK.ui.showCenterMuteStatus(HealingK.state.isMuted);
+  HealingK.ui.showUI();
 },
 
 togglePlayPause(){
@@ -3072,6 +3074,7 @@ window.location.href = BLOG_POST_URL; // BLOG_POST_URL은 video-data.js에서 �
 function onYouTubeIframeAPIReady(){
 
 initializeHealingKPlayer();
+
 requestAnimationFrame(() => HealingK.utils.setScreenSize());
 
 };
