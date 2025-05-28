@@ -1,5 +1,4 @@
 // GitHub의 "healingmart/player" 레포지토리 내 "shortsplayer-logic.js" 파일의 내용
-// 이 파일은 "video-data.js" 파일이 먼저 로드된 후에 로드되어야 합니다.
 
 const HealingK = {
   state: {
@@ -172,9 +171,9 @@ const HealingK = {
         document.querySelectorAll('.hk-sort-buttons .hk-sort-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         this.state.searchSort = btn.dataset.sort;
-         if (this.elements.hkMyAlbumControls) {
-             this.elements.hkMyAlbumControls.style.display = 'none';
-         }
+           if (this.elements.hkMyAlbumControls) {
+               this.elements.hkMyAlbumControls.style.display = 'none';
+           }
         const currentQuery = this.elements.hkSearchInput ? this.elements.hkSearchInput.value : '';
         this.search.performSearch(currentQuery);
       });
@@ -194,13 +193,13 @@ const HealingK = {
         });
     }
 
-     if (this.elements.hkClearAllBookmarks) {
-         this.utils.addTapListener(this.elements.hkClearAllBookmarks, () => {
-             HealingK.ui.showConfirmationModal('MY앨범의 모든 영상을 삭제하시겠습니까?', () => {
-                 this.controller.clearAllBookmarks();
-             });
-         });
-     }
+       if (this.elements.hkClearAllBookmarks) {
+           this.utils.addTapListener(this.elements.hkClearAllBookmarks, () => {
+               HealingK.ui.showConfirmationModal('MY앨범의 모든 영상을 삭제하시겠습니까?', () => {
+                   this.controller.clearAllBookmarks();
+               });
+           });
+       }
 
     this.setupMouseHoverEvents();
     this.setupTouchEvents();
@@ -211,10 +210,10 @@ const HealingK = {
     }, 200));
      window.addEventListener('orientationchange', () => setTimeout(() => this.utils.setScreenSize(), 300));
      document.addEventListener('visibilitychange', () => {
-         if (document.visibilityState === 'visible') setTimeout(() => this.utils.setScreenSize(), 300);
+           if (document.visibilityState === 'visible') setTimeout(() => this.utils.setScreenSize(), 300);
      });
      if (window.visualViewport) {
-         window.visualViewport.addEventListener('resize', () => this.utils.setScreenSize());
+           window.visualViewport.addEventListener('resize', () => this.utils.setScreenSize());
      }
   },
   setupMouseHoverEvents() {
@@ -322,8 +321,8 @@ HealingK.progressBar = {
         const minutes = Math.floor((totalSeconds % 3600) / 60);
         const seconds = Math.floor(totalSeconds % 60);
         const pad = (num) => String(num).padStart(2, '0');
-        if (hours > 0) return `${hours}:${pad(minutes)}:${pad(seconds)}`;
-        return `${pad(minutes)}:${pad(seconds)}`;
+        if (hours > 0) return `<span class="math-inline">\{hours\}\:</span>{pad(minutes)}:${pad(seconds)}`;
+        return `<span class="math-inline">\{pad\(minutes\)\}\:</span>{pad(seconds)}`;
     },
     updateTooltip(currentTime, duration, event) {
         if (!HealingK.elements.hkProgressBarTooltip) return;
@@ -440,7 +439,7 @@ HealingK.utils = {
   getOptimizedThumbnail(videoId) {
     if (!videoId) return 'https://placehold.co/180x320/111111/FFFFFF?text=Invalid+ID'; // videoId가 없을 경우 대체 이미지
     const quality = window.innerWidth <= 768 ? 'mqdefault' : 'hqdefault';
-    return `https://i.ytimg.com/vi/${videoId}/${quality}.jpg`;
+    return `https://i.ytimg.com/vi/<span class="math-inline">\{videoId\}/</span>{quality}.jpg`;
   },
   saveToStorage(key, data) { try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn('LS save failed:', e); e.message = 'LS save failed: ' + e.message; HealingK.ui.showMessage('데이터 저장에 실패했습니다.', 2000); } },
   loadFromStorage(key, dV = null) { try { const i = localStorage.getItem(key); return i ? JSON.parse(i) : dV; } catch (e) { console.warn('LS load failed:', e); e.message = 'LS load failed: ' + e.message; return dV; } } ,
@@ -500,9 +499,9 @@ HealingK.search = {
 
     if (HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks') {
         videosToSearch = HealingK.dataManager.getBookmarkedVideosFullData().map(vid => ({ ...vid, category: "MY앨범" }));
-         HealingK.state.searchResults = videosToSearch;
-         if (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search') HealingK.ui.renderSearchGrid();
-         return;
+           HealingK.state.searchResults = videosToSearch;
+           if (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search') HealingK.ui.renderSearchGrid();
+           return;
     }
 
     videosToSearch = videoData.flatMap(cat => cat.videos.map(vid => ({ ...vid, category: cat.category })));
@@ -555,56 +554,56 @@ HealingK.search = {
 
 HealingK.dataManager = {
   getCurrentCategory: () => {
-      if (typeof MY_ALBUM_CATEGORY_INDEX === 'undefined' || typeof videoData === 'undefined') {
-          console.error("MY_ALBUM_CATEGORY_INDEX or videoData is not defined.");
-          return null;
-      }
-      if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
-          return { category: "MY앨범", videos: HealingK.dataManager.getBookmarkedVideosFullData() };
-      }
-      return videoData[HealingK.state.currentCategoryIndex] || null;
+       if (typeof MY_ALBUM_CATEGORY_INDEX === 'undefined' || typeof videoData === 'undefined') {
+           console.error("MY_ALBUM_CATEGORY_INDEX or videoData is not defined.");
+           return null;
+       }
+       if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
+           return { category: "MY앨범", videos: HealingK.dataManager.getBookmarkedVideosFullData() };
+       }
+       return videoData[HealingK.state.currentCategoryIndex] || null;
   },
   getCurrentVideo() {
-      const cat = this.getCurrentCategory();
-      return cat?.videos?.[HealingK.state.currentVideoIndex] || null;
+       const cat = this.getCurrentCategory();
+       return cat?.videos?.[HealingK.state.currentVideoIndex] || null;
   },
   toggleBookmark(vId) {
-      const idx = HealingK.state.bookmarkedVideos.indexOf(vId);
-      const wasBookmarked = idx > -1;
+       const idx = HealingK.state.bookmarkedVideos.indexOf(vId);
+       const wasBookmarked = idx > -1;
 
-      if(wasBookmarked) {
-        HealingK.state.bookmarkedVideos.splice(idx,1);
-        HealingK.ui.showMessage('MY앨범에서 삭제');
-      } else {
-        HealingK.state.bookmarkedVideos.push(vId);
-        HealingK.ui.showMessage('MY앨범에 추가');
-      }
-      HealingK.utils.saveToStorage('hk-bookmarks',HealingK.state.bookmarkedVideos);
-      HealingK.ui.updateBottomNav();
-      HealingK.ui.renderCategoryTabs();
+       if(wasBookmarked) {
+         HealingK.state.bookmarkedVideos.splice(idx,1);
+         HealingK.ui.showMessage('MY앨범에서 삭제');
+       } else {
+         HealingK.state.bookmarkedVideos.push(vId);
+         HealingK.ui.showMessage('MY앨범에 추가');
+       }
+       HealingK.utils.saveToStorage('hk-bookmarks',HealingK.state.bookmarkedVideos);
+       HealingK.ui.updateBottomNav();
+       HealingK.ui.renderCategoryTabs();
 
-      if (typeof MY_ALBUM_CATEGORY_INDEX === 'undefined') return;
+       if (typeof MY_ALBUM_CATEGORY_INDEX === 'undefined') return;
 
-      if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
-          const currentBookmarks = HealingK.dataManager.getBookmarkedVideosFullData();
-          if (currentBookmarks.length === 0) {
-             if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
-                 HealingK.controller.goHome();
-             } else {
-                 HealingK.ui.renderSearchGrid();
-             }
-          } else {
-             if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
+       if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
+           const currentBookmarks = HealingK.dataManager.getBookmarkedVideosFullData();
+           if (currentBookmarks.length === 0) {
+              if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
+                  HealingK.controller.goHome();
+              } else {
+                  HealingK.ui.renderSearchGrid();
+              }
+           } else {
+              if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
                 HealingK.state.currentVideoIndex = Math.max(0, Math.min(HealingK.state.currentVideoIndex, currentBookmarks.length - 1));
-             }
-             if ((HealingK.state.isPanelVisible && HealingK.state.panelMode === 'thumbnail' && HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
-                 HealingK.ui.renderActiveGrid();
-             }
-             if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX && wasBookmarked && !currentBookmarks.find(v => v.id === vId)) {
-                 HealingK.controller.loadCurrentVideo('none');
-             }
-          }
-      }
+              }
+              if ((HealingK.state.isPanelVisible && HealingK.state.panelMode === 'thumbnail' && HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
+                  HealingK.ui.renderActiveGrid();
+              }
+              if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX && wasBookmarked && !currentBookmarks.find(v => v.id === vId)) {
+                  HealingK.controller.loadCurrentVideo('none');
+              }
+           }
+       }
   },
   isBookmarked: (vId) => HealingK.state.bookmarkedVideos.includes(vId),
   getBookmarkedVideosFullData: () => {
@@ -626,12 +625,12 @@ HealingK.dataManager = {
 
         if (typeof MY_ALBUM_CATEGORY_INDEX === 'undefined') return;
 
-         if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
-             HealingK.ui.renderActiveGrid();
-             if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
+          if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX || (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search' && HealingK.state.searchSort === 'bookmarks')) {
+              HealingK.ui.renderActiveGrid();
+              if (HealingK.state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) {
                 HealingK.controller.goHome();
-             }
-         }
+              }
+          }
    }
 };
 
@@ -641,7 +640,7 @@ HealingK.share = {
     const baseUrl = (typeof BLOG_POST_URL !== 'undefined' && BLOG_POST_URL ? BLOG_POST_URL.replace(/\/+$/, '') : window.location.origin) + '/?';
 
     if (currentVideo) {
-      return `${baseUrl}videoId=${encodeURIComponent(currentVideo.id)}`;
+      return `<span class="math-inline">\{baseUrl\}videoId\=</span>{encodeURIComponent(currentVideo.id)}`;
     }
     return baseUrl;
   },
@@ -672,7 +671,7 @@ HealingK.share = {
     const currentVideo = HealingK.dataManager.getCurrentVideo();
     const url = this.generateShareUrl();
     const title = currentVideo ? `${currentVideo.title} - HealingK` : 'HealingK 쇼츠 플레이어';
-    const text = currentVideo ? `HealingK에서 "${currentVideo.title}"(${currentVideo.artist || ''}) 영상을 감상해보세요!` : `HealingK 쇼츠 플레이어에서 다양한 영상을 감상해보세요!`;
+    const text = currentVideo ? `HealingK에서 "<span class="math-inline">\{currentVideo\.title\}"\(</span>{currentVideo.artist || ''}) 영상을 감상해보세요!` : `HealingK 쇼츠 플레이어에서 다양한 영상을 감상해보세요!`;
 
     if (navigator.share) {
         try {
@@ -806,29 +805,29 @@ HealingK.ui = {
         requestAnimationFrame(() => { HealingK.state.isGridLayingOut = false; });
    },
    renderRecentSearches() {
-       const recentSearchesContainer = HealingK.elements.hkRecentSearches;
-       if (!recentSearchesContainer) return;
-       recentSearchesContainer.innerHTML = '';
-       if (HealingK.state.recentSearches.length === 0) {
-           return;
-       }
-       const fragment = document.createDocumentFragment();
-       HealingK.state.recentSearches.forEach(term => {
-           const item = document.createElement('div');
-           item.className = 'hk-recent-search-item';
-           item.textContent = term;
-           fragment.appendChild(item);
-       });
-       recentSearchesContainer.appendChild(fragment);
+        const recentSearchesContainer = HealingK.elements.hkRecentSearches;
+        if (!recentSearchesContainer) return;
+        recentSearchesContainer.innerHTML = '';
+        if (HealingK.state.recentSearches.length === 0) {
+            return;
+        }
+        const fragment = document.createDocumentFragment();
+        HealingK.state.recentSearches.forEach(term => {
+            const item = document.createElement('div');
+            item.className = 'hk-recent-search-item';
+            item.textContent = term;
+            fragment.appendChild(item);
+        });
+        recentSearchesContainer.appendChild(fragment);
    },
    toggleRecentSearches(show) {
-       if (!HealingK.elements.hkRecentSearches) return;
-       const shouldShow = typeof show === 'boolean' ? show : HealingK.elements.hkRecentSearches.style.display === 'none';
-       if (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search') {
-           HealingK.elements.hkRecentSearches.style.display = shouldShow ? 'block' : 'none';
-       } else {
-           HealingK.elements.hkRecentSearches.style.display = 'none';
-       }
+        if (!HealingK.elements.hkRecentSearches) return;
+        const shouldShow = typeof show === 'boolean' ? show : HealingK.elements.hkRecentSearches.style.display === 'none';
+        if (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search') {
+            HealingK.elements.hkRecentSearches.style.display = shouldShow ? 'block' : 'none';
+        } else {
+            HealingK.elements.hkRecentSearches.style.display = 'none';
+        }
    },
   togglePanel(mode = null) {
       const { state, elements } = HealingK;
@@ -889,8 +888,8 @@ HealingK.ui = {
               if (elements.hkPanelTitle) elements.hkPanelTitle.innerHTML = (typeof MY_ALBUM_CATEGORY_INDEX !== 'undefined' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) ? '❤️ MY앨범' : '📋 재생목록';
               if (elements.hkSearchElements) elements.hkSearchElements.style.display='none';
               if (elements.hkMyAlbumControls) {
-                    elements.hkMyAlbumControls.style.display = (typeof MY_ALBUM_CATEGORY_INDEX !== 'undefined' && state.panelMode === 'thumbnail' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) ? 'flex' : 'none';
-               }
+                   elements.hkMyAlbumControls.style.display = (typeof MY_ALBUM_CATEGORY_INDEX !== 'undefined' && state.panelMode === 'thumbnail' && state.currentCategoryIndex === MY_ALBUM_CATEGORY_INDEX) ? 'flex' : 'none';
+              }
           }
           this.renderActiveGrid();
       } else { // Panel is closing
@@ -940,7 +939,7 @@ HealingK.ui = {
 
     HealingK.elements.hkIndicator.innerHTML=`
         <div style="line-height: 1.3; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-            <div style="font-weight: bold;">${currentVideoNum}/${totalVideos}</div>
+            <div style="font-weight: bold;"><span class="math-inline">\{currentVideoNum\}/</span>{totalVideos}</div>
             <div style="font-size: 0.9em; margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
             ${artist ? `<small style="font-size: 0.8em; opacity: 0.8; margin-top: 1px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: block;">${artist}</small>` : ''}
         </div>`;
@@ -975,7 +974,7 @@ HealingK.ui = {
         this.updateIndicator();
     }, duration);
   },
-updateBottomNav(){
+  updateBottomNav(){
       const buttonIds = ['hk-nav-back-to-blog', 'hk-nav-search', 'hk-nav-play-pause', 'hk-nav-volume', 'hk-nav-home', 'hk-nav-bookmark', 'hk-nav-share', 'hk-nav-help'];
       buttonIds.forEach(id => {
           const el = document.getElementById(id);
@@ -985,16 +984,16 @@ updateBottomNav(){
 
           switch(id) {
               case 'hk-nav-play-pause':
-                  // --- 이 부분이 수정됩니다 ---
+                  // *** 이 부분이 수정되어야 할 부분입니다. 위에서 복사한 코드와 비교해 보세요. ***
                   const playerState = (HealingK.state.player && HealingK.state.isPlayerReady && typeof HealingK.state.player.getPlayerState === 'function')
-                    ? HealingK.state.player.getPlayerState() : -1; // -1은 알 수 없는 상태를 의미 (YT.PlayerState에 없음)
+                      ? HealingK.state.player.getPlayerState() : -1; // -1은 알 수 없는 상태를 의미 (YT.PlayerState에 없음)
 
                   if (HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible) {
-                       if(icon) icon.className = 'fa fa-pause'; // 패널 열려있으면 일시정지 아이콘
-                       isActive = true;
+                      if(icon) icon.className = 'fa fa-pause'; // 패널 열려있으면 일시정지 아이콘
+                      isActive = true;
                   } else {
-                       if(icon) icon.className = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING) ? 'fa fa-pause' : 'fa fa-play'; // 플레이 중이면 일시정지, 아니면 재생
-                       isActive = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING);
+                      if(icon) icon.className = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING) ? 'fa fa-pause' : 'fa fa-play'; // 플레이 중이면 일시정지, 아니면 재생
+                      isActive = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING);
                   }
                   break;
               case 'hk-nav-volume':
@@ -1260,14 +1259,14 @@ HealingK.youtubeManager = {
 
     const playerEmbed = HealingK.elements.hkYoutubeEmbed;
     if (!playerEmbed) {
-         console.error("hk-youtube-embed element not found!");
-         HealingK.ui.hideLoading();
-         HealingK.state.isTransitioning = false;
-         return;
+           console.error("hk-youtube-embed element not found!");
+           HealingK.ui.hideLoading();
+           HealingK.state.isTransitioning = false;
+           return;
     }
 
     if (animationDirection === 'none') {
-         HealingK.ui.showLoading();
+           HealingK.ui.showLoading();
     }
 
     HealingK.state.player=new YT.Player('hk-youtube-embed',{
@@ -1388,41 +1387,41 @@ HealingK.youtubeManager = {
 
     switch(playerState){
       case YT.PlayerState.ENDED:
-            HealingK.state.isFadingOut = false;
-            if (!HealingK.state.isTransitioning) {
-                 HealingK.ui.showLoading();
-            }
-            HealingK.ui.stopProgressBarUpdate();
-            if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '100%';
+           HealingK.state.isFadingOut = false;
+           if (!HealingK.state.isTransitioning) {
+               HealingK.ui.showLoading();
+           }
+           HealingK.ui.stopProgressBarUpdate();
+           if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '100%';
 
-            setTimeout(() => {
-                HealingK.controller.playNextVideoWithAnimation();
-            }, 100);
-            break;
+           setTimeout(() => {
+               HealingK.controller.playNextVideoWithAnimation();
+           }, 100);
+           break;
       case YT.PlayerState.PLAYING:{
         const ph=HealingK.elements.hkVideoPlaceholder;
         if(ph&&!ph.classList.contains('hidden')){
           setTimeout(()=>ph.classList.add('hidden'),50);
         }
-         if (HealingK.state.isTransitioning) {
-             if (playerEmbed) {
-                  playerEmbed.style.transition = 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease-out';
-                  playerEmbed.style.transform = 'translateY(0)';
-                  playerEmbed.style.opacity = 1;
-                  setTimeout(() => {
-                      HealingK.state.isTransitioning = false;
-                      if (playerEmbed) playerEmbed.style.transition = 'opacity 0.3s ease';
-                  }, 350);
-             } else {
-                  HealingK.state.isTransitioning = false;
-             }
-         } else {
-              if (playerEmbed) {
-                  playerEmbed.style.transition = 'opacity 0.3s ease-out';
-                  playerEmbed.style.transform = 'translateY(0)';
-                  playerEmbed.style.opacity = 1;
-              }
-         }
+           if (HealingK.state.isTransitioning) {
+               if (playerEmbed) {
+                    playerEmbed.style.transition = 'transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease-out';
+                    playerEmbed.style.transform = 'translateY(0)';
+                    playerEmbed.style.opacity = 1;
+                    setTimeout(() => {
+                        HealingK.state.isTransitioning = false;
+                        if (playerEmbed) playerEmbed.style.transition = 'opacity 0.3s ease';
+                    }, 350);
+               } else {
+                   HealingK.state.isTransitioning = false;
+               }
+           } else {
+               if (playerEmbed) {
+                    playerEmbed.style.transition = 'opacity 0.3s ease-out';
+                    playerEmbed.style.transform = 'translateY(0)';
+                    playerEmbed.style.opacity = 1;
+               }
+           }
         HealingK.ui.hideLoading();
         HealingK.ui.startProgressBarUpdate();
 
@@ -1442,10 +1441,10 @@ HealingK.youtubeManager = {
         break;
       }
       case YT.PlayerState.PAUSED:
-            HealingK.ui.hideLoading();
-            HealingK.ui.stopProgressBarUpdate();
-            clearTimeout(HealingK.state.uiTimeout);
-            break;
+           HealingK.ui.hideLoading();
+           HealingK.ui.stopProgressBarUpdate();
+           clearTimeout(HealingK.state.uiTimeout);
+           break;
       case YT.PlayerState.BUFFERING:{
         const ph=HealingK.elements.hkVideoPlaceholder;
         if(ph)ph.classList.remove('hidden');
@@ -1456,16 +1455,16 @@ HealingK.youtubeManager = {
         break;
       }
       case YT.PlayerState.CUED:
-             HealingK.ui.showLoading();
-             HealingK.ui.stopProgressBarUpdate();
-             if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-            clearTimeout(HealingK.state.uiTimeout);
-            break;
+           HealingK.ui.showLoading();
+           HealingK.ui.stopProgressBarUpdate();
+           if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+           clearTimeout(HealingK.state.uiTimeout);
+           break;
       default:
-             HealingK.ui.stopProgressBarUpdate();
-             if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
-            clearTimeout(HealingK.state.uiTimeout);
-            break;
+           HealingK.ui.stopProgressBarUpdate();
+           if (HealingK.elements.hkProgressBarFill) HealingK.elements.hkProgressBarFill.style.width = '0%';
+           clearTimeout(HealingK.state.uiTimeout);
+           break;
     }
     HealingK.ui.updatePlayerUIStates();
   },
@@ -1528,7 +1527,7 @@ HealingK.controller = {
   },
   switchVideo(idx, animationDirection = 'none'){
      if (HealingK.state.isTransitioning && animationDirection !== 'none') {
-         return;
+           return;
      }
 
     const cat=HealingK.dataManager.getCurrentCategory();
@@ -1544,12 +1543,12 @@ HealingK.controller = {
     if (currentVideo && cat.videos[idx] && currentVideo.id === cat.videos[idx].id && animationDirection !== 'none') {
       // Allow animation for same video
     } else if (currentVideo && cat.videos[idx] && currentVideo.id === cat.videos[idx].id) {
-         HealingK.state.isTransitioning = false;
-         HealingK.ui.hideLoading();
-         if(HealingK.state.isPanelVisible && animationDirection === 'none') {
-             HealingK.ui.togglePanel();
-         }
-         return;
+           HealingK.state.isTransitioning = false;
+           HealingK.ui.hideLoading();
+           if(HealingK.state.isPanelVisible && animationDirection === 'none') {
+               HealingK.ui.togglePanel();
+           }
+           return;
     }
 
     HealingK.state.currentVideoIndex=idx;
@@ -1560,9 +1559,9 @@ HealingK.controller = {
   },
   loadCurrentVideo(animationDirection = 'none'){
     if (animationDirection !== 'none') {
-         HealingK.state.isTransitioning = true;
+           HealingK.state.isTransitioning = true;
     } else {
-         HealingK.state.isTransitioning = false;
+           HealingK.state.isTransitioning = false;
     }
     HealingK.state.isFadingOut = false;
 
@@ -1638,7 +1637,7 @@ HealingK.controller = {
 
     const totalCategories = videoData.length + 1;
     let nextCatIndex = (HealingK.state.currentCategoryIndex + 1);
-     if (nextCatIndex >= totalCategories) nextCatIndex = 0;
+       if (nextCatIndex >= totalCategories) nextCatIndex = 0;
 
     if (nextCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0) {
         if (totalCategories > 1) {
@@ -1662,17 +1661,17 @@ HealingK.controller = {
     let prevCatIndex = (HealingK.state.currentCategoryIndex - 1 + totalCategories) % totalCategories;
 
     if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0) {
-         if (totalCategories > 1) {
+          if (totalCategories > 1) {
              prevCatIndex = (prevCatIndex - 1 + totalCategories) % totalCategories;
              if (prevCatIndex === MY_ALBUM_CATEGORY_INDEX && HealingK.dataManager.getBookmarkedVideosFullData().length === 0) {
                  prevCatIndex = videoData.length -1;
                  if (prevCatIndex < 0) prevCatIndex = 0;
              }
              HealingK.ui.showMessage('MY앨범 목록이 비어있어 건너뜁니다.', 1500);
-         } else {
+          } else {
               HealingK.ui.showMessage('MY앨범 목록이 비어있어 다른 카테고리로 이동할 수 없습니다.', 1500);
               return;
-         }
+          }
     }
     this.switchCategory(prevCatIndex);
   },
@@ -1705,7 +1704,7 @@ HealingK.controller = {
     if (HealingK.elements.hkSoundToggle) HealingK.elements.hkSoundToggle.classList.add('hidden');
     HealingK.ui.updateBottomNav();
     HealingK.ui.showCenterMuteStatus(false);
-     HealingK.ui.showUI();
+      HealingK.ui.showUI();
   },
   toggleMute(){
     if(!HealingK.state.soundEnabled){this.enableSound();return;}
@@ -1731,7 +1730,7 @@ HealingK.controller = {
     }
     HealingK.ui.updateBottomNav();
     HealingK.ui.showCenterMuteStatus(HealingK.state.isMuted);
-     HealingK.ui.showUI();
+      HealingK.ui.showUI();
   },
   togglePlayPause(){
     if(HealingK.state.player?.getPlayerState){
@@ -1744,16 +1743,16 @@ HealingK.controller = {
         } else if (pS === YT.PlayerState.CUED) {
             HealingK.state.player.playVideo();
         }
-         HealingK.ui.showUI();
+          HealingK.ui.showUI();
     }
   },
   toggleBookmark(){
     const cV=HealingK.dataManager.getCurrentVideo();
     if(cV)HealingK.dataManager.toggleBookmark(cV.id);
-     HealingK.ui.showUI();
+      HealingK.ui.showUI();
   },
    clearAllBookmarks() {
-       HealingK.dataManager.clearAllBookmarks();
+        HealingK.dataManager.clearAllBookmarks();
    },
   goToBlogPost() {
     const targetUrl = (typeof BLOG_POST_URL !== 'undefined' && BLOG_POST_URL && BLOG_POST_URL !== "#") ? BLOG_POST_URL : "https://healingk.com";
@@ -1788,4 +1787,4 @@ document.addEventListener('DOMContentLoaded',function(){
     requestAnimationFrame(() => HealingK.utils.setScreenSize());
     setTimeout(() => HealingK.utils.setScreenSize(), 100);
     setTimeout(() => HealingK.utils.setScreenSize(), 500);
-});
+}); 
