@@ -492,7 +492,7 @@ HealingK.search = {
     HealingK.state.searchQuery = query;
     let videosToSearch = [];
     if (typeof videoData === 'undefined') {
-        console.error("videoData is not defined. Make sure video-data.js is loaded before shortsplayer-logic.js");
+        console.error("videoData is not defined. Make sure video-data.js is loaded before shortsplayer-logic1.js");
         HealingK.state.searchResults = [];
         if (HealingK.state.isPanelVisible && HealingK.state.panelMode === 'search') HealingK.ui.renderSearchGrid();
         return;
