@@ -71,3 +71,6 @@
   document.dispatchEvent(event);
   console.log('video-data.js 로드 완료:', new Date().toISOString());
 })();
+
+console.log("Video data loaded at: " + new Date().toISOString());
+
