@@ -12,7 +12,7 @@ const videoData = [
       { id: "kpop-3-Ivjq-fTenTU", videoUrl: "Ivjq-fTenTU", title: "수면을 위한 편안한 음악", artist: "Sleep Music", uploadDate: "2023-10-30" },
       { id: "kpop-4-eCy_YkOazSU", videoUrl: "eCy_YkOazSU", title: "숲속의 새소리", artist: "Forest Birds", uploadDate: "2023-11-10" }
     ]
-  },
+  }, 
   {
     category: "힐링",
     videos: [
