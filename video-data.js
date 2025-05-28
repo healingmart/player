@@ -3,6 +3,9 @@
 const BLOG_POST_URL = "https://healingk.com";
 const HELP_MORE_URL = "https://healingk.com/player-help";
 
+// 캐시 무효화를 위한 버전 번호 (이 값을 변경하면 캐시가 무효화됩니다)
+const DATA_VERSION = "1.0.1"; // 데이터 변경 시 이 값을 증가시키세요 (예: 1.0.2, 1.0.3...)
+
 const videoData = [
   {
     category: "K-POP",
@@ -50,3 +53,6 @@ const videoData = [
 
 // MY_ALBUM_CATEGORY_INDEX는 videoData 정의 이후에 와야 합니다.
 const MY_ALBUM_CATEGORY_INDEX = videoData.length;
+
+// 콘솔에 버전 정보 출력 (디버깅용)
+console.log("Video data loaded. Version: " + DATA_VERSION);
