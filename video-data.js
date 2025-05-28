@@ -21,9 +21,9 @@ const videoData = [
       { id: "healing-3-X5KmIrCjjLc", videoUrl: "X5KmIrCjjLc", title: "스트레스 해소 음악 2", artist: "Relaxing Sounds", uploadDate: "2024-03-25" },
       { id: "healing-4-Ivjq-fTenTU", videoUrl: "Ivjq-fTenTU", title: "수면을 위한 편안한 음악 2", artist: "Sleep Music", uploadDate: "2024-04-30" },
       { id: "healing-5-eCy_YkOazSU", videoUrl: "eCy_YkOazSU", title: "숲속의 새소리 2", artist: "Forest Birds", uploadDate: "2024-05-10" },
-      { id: "healing-6-esgZFRSB3YU", videoUrl: "esgZFRSB3YU", title: "바다 파도 소리", artist: "Ocean Waves", uploadDate: "2024-05-20" },
-      { id: "healing-7-X5KmIrCjjLc", videoUrl: "X5KmIrCjjLc", title: "빗소리와 함께하는 휴식", artist: "Rain Sounds", uploadDate: "2024-05-22" },
-      { id: "healing-8-Ivjq-fTenTU", videoUrl: "Ivjq-fTenTU", title: "겨울 힐링 컬렉션", artist: "Winter Healing", uploadDate: "2024-05-24" }
+      { id: "healing-6-esgZFRSB3YU-wave", videoUrl: "esgZFRSB3YU", title: "바다 파도 소리", artist: "Ocean Waves", uploadDate: "2024-05-20" },
+      { id: "healing-7-X5KmIrCjjLc-rain", videoUrl: "X5KmIrCjjLc", title: "빗소리와 함께하는 휴식", artist: "Rain Sounds", uploadDate: "2024-05-22" },
+      { id: "healing-8-Ivjq-fTenTU-winter", videoUrl: "Ivjq-fTenTU", title: "겨울 힐링 컬렉션", artist: "Winter Healing", uploadDate: "2024-05-24" }
     ]
   },
   {
