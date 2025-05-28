@@ -975,7 +975,7 @@ HealingK.ui = {
         this.updateIndicator();
     }, duration);
   },
-  updateBottomNav(){
+updateBottomNav(){
       const buttonIds = ['hk-nav-back-to-blog', 'hk-nav-search', 'hk-nav-play-pause', 'hk-nav-volume', 'hk-nav-home', 'hk-nav-bookmark', 'hk-nav-share', 'hk-nav-help'];
       buttonIds.forEach(id => {
           const el = document.getElementById(id);
@@ -985,14 +985,17 @@ HealingK.ui = {
 
           switch(id) {
               case 'hk-nav-play-pause':
-                  const playerState = HealingK.state.player?.getPlayerState();
-                   if (HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible) {
-                       if(icon) icon.className = 'fa fa-pause';
+                  // --- 이 부분이 수정됩니다 ---
+                  const playerState = (HealingK.state.player && HealingK.state.isPlayerReady && typeof HealingK.state.player.getPlayerState === 'function')
+                    ? HealingK.state.player.getPlayerState() : -1; // -1은 알 수 없는 상태를 의미 (YT.PlayerState에 없음)
+
+                  if (HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible) {
+                       if(icon) icon.className = 'fa fa-pause'; // 패널 열려있으면 일시정지 아이콘
                        isActive = true;
-                   } else {
-                       if(icon) icon.className = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING) ? 'fa fa-play' : 'fa fa-pause';
+                  } else {
+                       if(icon) icon.className = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING) ? 'fa fa-pause' : 'fa fa-play'; // 플레이 중이면 일시정지, 아니면 재생
                        isActive = (playerState === YT.PlayerState.PLAYING || playerState === YT.PlayerState.BUFFERING);
-                   }
+                  }
                   break;
               case 'hk-nav-volume':
                   const isSoundEffectivelyOff = HealingK.state.isMuted || !HealingK.state.soundEnabled || HealingK.state.isPanelVisible || HealingK.state.isHelpModalVisible || HealingK.state.isShareModalVisible;
