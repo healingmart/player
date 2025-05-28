@@ -37,9 +37,9 @@ const videoData = [
     ]
   },
   {
-    category: "Lo-Fi",
+    category: "Lullaby",
     videos: [
-      { id: "hk-l1", videoUrl: "X5KmIrCjjLc", title: "Lo-Fi Hip Hop 24/7 라이브", artist: "Lo-Fi Beats", uploadDate: "2023-04-20" },
+      { id: "lullaby-01", videoUrl: "I1UhdqSxBYg", title: "반짝반짝 작은별", artist: "Dr.Kim(김박사)", uploadDate: "2023-04-20" },
           { id: "hk-kpop-h2", videoUrl: "esgZFRSB3YU", title: "명상과 휴식을 위한 음악", artist: "Meditation Music", uploadDate: "2023-07-20" },
       { id: "hk-kpop-h3", videoUrl: "X5KmIrCjjLc", title: "스트레스 해소 음악", artist: "Relaxing Sounds", uploadDate: "2023-09-25" },
       { id: "hk-kpop-h4", videoUrl: "Ivjq-fTenTU", title: "수면을 위한 편안한 음악", artist: "Sleep Music", uploadDate: "2023-10-30" },
